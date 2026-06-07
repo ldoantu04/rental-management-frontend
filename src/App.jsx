@@ -1,12 +1,18 @@
-import { useState } from 'react'
+import React from 'react'
+import { Routes, Route } from 'react-router-dom'
+import Login from './pages/Login'
 
-function App() {
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+
+const App = () => {
   return (
-    <>
-      <h1 className="text-red-500 text-4xl font-bold text-center mt-10">
-        Hello world
-      </h1>
-    </>
+    <div>
+      <ToastContainer />
+      <Routes>
+        <Route path='/login' element={<Login />} />
+      </Routes>
+    </div>
   )
 }
 
