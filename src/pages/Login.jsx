@@ -1,10 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import { assets } from '../assets/assets'
 import LoginBranding from '../components/LoginBranding'
 import { toast } from 'react-toastify'
 import axios from 'axios'
+import { RentalContext } from '../context/RentalContext'
 
 const Login = () => {
+    
+    const { backendUrl, token, setToken, navigate } = useContext(RentalContext)
 
     const [currentStep, setCurrentStep] = useState('email')
     const [email, setEmail] = useState('')
@@ -13,6 +16,12 @@ const Login = () => {
     const [countdown, setCountdown] = useState(0)
 
     const inputRefs = useRef([])
+
+    useEffect(() => {
+        if (token) {
+            navigate('/')
+        }
+    }, [token])
 
     useEffect(() => {
         if (countdown <= 0) return
@@ -24,9 +33,10 @@ const Login = () => {
         event.preventDefault()
         setLoading(true)
         try {
+            const response = await axios.post(backendUrl + '/auth/send-otp', { email })
             setCurrentStep('otp')
             setCountdown(60)
-            toast.success('Mã OTP đã được gửi!')
+            toast.success(response.data.message)
         } catch (error) {
             console.log(error)
             toast.error(error.message)
@@ -43,7 +53,15 @@ const Login = () => {
         }
         setLoading(true)
         try {
-            toast.success('Đăng nhập thành công!')
+            const response = await axios.post(backendUrl + '/auth/login', { email, otp: otpCode })
+            if (response.data.jwt) {
+                setToken(response.data.jwt)
+                localStorage.setItem('token', response.data.jwt)
+                toast.success(response.data.message)
+                navigate('/')
+            } else {
+                toast.error(response.data.message)
+            }
         } catch (error) {
             console.log(error)
             toast.error(error.message)
@@ -54,9 +72,10 @@ const Login = () => {
     const onResendOtp = async () => {
         if (countdown > 0) return
         try {
+            const response = await axios.post(backendUrl + '/auth/send-otp', { email })
             setOtp(Array(6).fill(''))
             setCountdown(60)
-            toast.success('Mã OTP đã được gửi lại!')
+            toast.success(response.data.message)
         } catch (error) {
             console.log(error)
             toast.error(error.message)
