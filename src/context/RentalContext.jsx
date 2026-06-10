@@ -28,6 +28,27 @@ const RentalContextProvider = (props) => {
         }
     }, [token]);
 
+        // Lấy thông tin user khi có token
+    const fetchUserProfile = async () => {
+        try {
+            const response = await axios.get(backendUrl + '/api/users/profile', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setUser(response.data);
+        } catch (error) {
+            console.log('Lỗi khi lấy thông tin user:', error);
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                logout();
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (token) {
+            fetchUserProfile();
+        }
+    }, [token]);
+
     // Hàm logout
     const logout = () => {
         setToken('');
