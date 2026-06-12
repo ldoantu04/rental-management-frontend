@@ -19,6 +19,9 @@ import icon_hoadonthanhtoan from './icon_hoadonthanhtoan.png'
 import icon_hopdongsaphet from './icon_hopdongsaphet.png'
 import icon_hopdonghethan from './icon_hopdonghethan.png'
 import icon_thanhtoancham from './icon_thanhtoancham.png'
+import icon_xemchitiet from './icon_xemchitiet.png'
+import icon_sua from './icon_sua.png'
+import icon_xoa from './icon_xoa.png'
 
 export const assets = {
     logo,
@@ -42,4 +45,7 @@ export const assets = {
     icon_hopdongsaphet,
     icon_hopdonghethan,
     icon_thanhtoancham,
+    icon_xemchitiet,
+    icon_sua,
+    icon_xoa
 }
