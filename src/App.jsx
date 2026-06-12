@@ -8,6 +8,7 @@ import Tenant from './pages/Tenant'
 import Contract from './pages/Contract'
 import Invoice from './pages/Invoice'
 import Transaction from './pages/Transaction'
+import Staff from './pages/Staff'
 import { RentalContext } from './context/RentalContext'
 
 import { ToastContainer } from 'react-toastify'
@@ -30,6 +31,7 @@ const App = () => {
         <Route path='/hop-dong' element={token ? <Contract /> : <Navigate to='/login' />} />
         <Route path='/hoa-don' element={token ? <Invoice /> : <Navigate to='/login' />} />
         <Route path='/giao-dich' element={token ? <Transaction /> : <Navigate to='/login' />} />
+        <Route path='/nhan-vien' element={token ? <Staff /> : <Navigate to='/login' />} />
       </Routes>
     </div>
   )
