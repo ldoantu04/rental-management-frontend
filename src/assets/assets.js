@@ -23,6 +23,7 @@ import icon_xemchitiet from './icon_xemchitiet.png'
 import icon_sua from './icon_sua.png'
 import icon_xoa from './icon_xoa.png'
 import icon_download from './icon_download.png'
+import icon_xemprofile from './icon_xemprofile.png'
 
 export const assets = {
     logo,
@@ -50,4 +51,5 @@ export const assets = {
     icon_sua,
     icon_xoa,
     icon_download,
+    icon_xemprofile,
 }
