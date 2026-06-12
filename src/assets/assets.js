@@ -22,6 +22,7 @@ import icon_thanhtoancham from './icon_thanhtoancham.png'
 import icon_xemchitiet from './icon_xemchitiet.png'
 import icon_sua from './icon_sua.png'
 import icon_xoa from './icon_xoa.png'
+import icon_download from './icon_download.png'
 
 export const assets = {
     logo,
@@ -47,5 +48,6 @@ export const assets = {
     icon_thanhtoancham,
     icon_xemchitiet,
     icon_sua,
-    icon_xoa
+    icon_xoa,
+    icon_download,
 }
