@@ -9,6 +9,7 @@ import Contract from './pages/Contract'
 import Invoice from './pages/Invoice'
 import Transaction from './pages/Transaction'
 import Staff from './pages/Staff'
+import Chatbot from './pages/Chatbot'
 import Setting from './pages/Setting'
 import { RentalContext } from './context/RentalContext'
 
@@ -33,6 +34,7 @@ const App = () => {
         <Route path='/hoa-don' element={token ? <Invoice /> : <Navigate to='/login' />} />
         <Route path='/giao-dich' element={token ? <Transaction /> : <Navigate to='/login' />} />
         <Route path='/nhan-vien' element={token ? <Staff /> : <Navigate to='/login' />} />
+        <Route path='/tro-ly-ai' element={token ? <Chatbot /> : <Navigate to='/login' />} />
         <Route path='/cai-dat' element={token ? <Setting /> : <Navigate to='/login' />} />
       </Routes>
     </div>
