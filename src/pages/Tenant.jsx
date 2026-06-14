@@ -426,16 +426,6 @@ const Tenant = () => {
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Tiền cọc (VNĐ)</span>
                                         <input type="number" min={0} value={formData.deposit} onChange={(event) => setFormData({ ...formData, deposit: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="7000000" />
                                     </label>
-                                    <label className="block">
-                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Phòng thuê</span>
-                                        <select value={formData.room} onChange={(event) => setFormData({ ...formData, room: event.target.value })} className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]">
-                                            {rooms.map((room) => <option key={room}>{room}</option>)}
-                                        </select>
-                                    </label>
-                                    <label className="block">
-                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Ngày bắt đầu thuê</span>
-                                        <input type="date" value={formData.startDate} onChange={(event) => setFormData({ ...formData, startDate: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" />
-                                    </label>
                                 </div>
                             </div>
 
@@ -449,11 +439,31 @@ const Tenant = () => {
 
                                 <div className="space-y-2">
                                     {formData.roommates.map((roommate, index) => (
-                                        <div key={index} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 rounded-xl bg-gray-50 p-3">
-                                            <input value={roommate.name} onChange={(event) => updateRoommate(index, 'name', event.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Họ và tên" />
-                                            <input value={roommate.relation} onChange={(event) => updateRoommate(index, 'relation', event.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Quan hệ" />
-                                            <input value={roommate.cccd} onChange={(event) => updateRoommate(index, 'cccd', event.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Số CCCD" />
-                                            <button type="button" onClick={() => removeRoommate(index)} className="px-2 text-gray-400 hover:text-red-600">×</button>
+                                        <div key={index} className="rounded-xl bg-gray-50 p-3">
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <p className="text-xs font-semibold uppercase text-gray-500">Người ở cùng #{index + 1}</p>
+                                                {formData.roommates.length > 1 && (
+                                                    <button type="button" onClick={() => removeRoommate(index)} className="flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-white text-[#80001C] transition-colors hover:bg-red-50" aria-label="Xóa người ở cùng">
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                                <label className="block">
+                                                    <span className="mb-1 block text-xs font-medium text-gray-500">Họ và tên</span>
+                                                    <input value={roommate.name} onChange={(event) => updateRoommate(index, 'name', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Họ và tên" />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="mb-1 block text-xs font-medium text-gray-500">Quan hệ</span>
+                                                    <input value={roommate.relation} onChange={(event) => updateRoommate(index, 'relation', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Quan hệ" />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="mb-1 block text-xs font-medium text-gray-500">Số CCCD</span>
+                                                    <input value={roommate.cccd} onChange={(event) => updateRoommate(index, 'cccd', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Số CCCD" />
+                                                </label>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

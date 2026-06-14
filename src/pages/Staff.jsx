@@ -512,15 +512,24 @@ const Staff = () => {
                                 ['Số điện thoại', detailStaff.phone],
                                 ['Email', detailStaff.email],
                                 ['Số CCCD', detailStaff.cccd],
-                                ['Ngày vào làm', formatDate(detailStaff.startDate)],
-                                ['Ngày sinh', formatDate(detailStaff.birthDate)],
-                                ['Địa chỉ', detailStaff.address]
+                                ['Ngày vào làm', formatDate(detailStaff.startDate)]
                             ].map(([label, value]) => (
-                                <div key={label} className={`rounded-xl bg-gray-50 p-4 ${label === 'Địa chỉ' ? 'md:col-span-2' : ''}`}>
+                                <div key={label} className="rounded-xl bg-gray-50 p-4">
                                     <p className="text-xs font-medium text-gray-400">{label}</p>
                                     <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
                                 </div>
                             ))}
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div className="rounded-xl bg-gray-50 p-4">
+                                <p className="text-xs font-medium text-gray-400">Ngày sinh</p>
+                                <p className="mt-1 text-sm font-semibold text-gray-900">{formatDate(detailStaff.birthDate)}</p>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 p-4">
+                                <p className="text-xs font-medium text-gray-400">Địa chỉ</p>
+                                <p className="mt-1 text-sm font-semibold text-gray-900">{detailStaff.address}</p>
+                            </div>
                         </div>
 
                         <p className="mb-3 mt-6 text-sm font-bold uppercase text-gray-400">Phạm vi quản lý</p>

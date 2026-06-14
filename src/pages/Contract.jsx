@@ -27,6 +27,13 @@ const serviceCatalog = [
     { name: 'Gửi xe', type: 'Theo phòng', price: 100000 }
 ]
 
+const serviceTypes = [
+    'Theo chỉ số',
+    'Theo m3',
+    'Theo người',
+    'Theo phòng',
+]
+
 const emptyContract = {
     tenant: 'Nguyễn Văn A',
     room: 'P101 - Nhà trọ Hoàng Long',
@@ -37,6 +44,8 @@ const emptyContract = {
     paymentDay: 5,
     status: 'ACTIVE',
     services: ['Điện', 'Nước', 'Internet'],
+    serviceTypesSelected: {},
+    extraServices: [],
     terms: '- Thanh toán đầy đủ trước ngày thanh toán hằng tháng\n- Không được nuôi thú cưng\n- Giữ gìn vệ sinh chung'
 }
 
@@ -136,6 +145,24 @@ const ContractPreview = ({ contract, onClose }) => (
                                 <span className="text-right font-semibold text-gray-900">{formatMoney(service.price)}</span>
                             </div>
                         ))}
+                        {contract.extraServices?.map((service, index) => (
+                        <div
+                            key={`extra-${index}`}
+                            className="grid grid-cols-3 px-5 py-3 text-sm"
+                        >
+                            <span className="font-medium text-gray-900">
+                                {service.name}
+                            </span>
+
+                            <span className="text-gray-500">
+                                {service.type}
+                            </span>
+
+                            <span className="text-right font-semibold text-gray-900">
+                                {formatMoney(service.price)}
+                            </span>
+                        </div>
+                    ))}
                     </div>
                 </div>
 
@@ -189,7 +216,7 @@ const Contract = () => {
 
     const openEditModal = (contract) => {
         setEditingContract(contract)
-        setFormData({ ...contract, deposit: String(contract.deposit), rent: String(contract.rent) })
+        setFormData({...contract, deposit: String(contract.deposit),rent: String(contract.rent),serviceTypesSelected:contract.serviceTypesSelected || {}})
         setShowForm(true)
     }
 
@@ -202,6 +229,49 @@ const Contract = () => {
         }))
     }
 
+    const updateServiceType = (serviceName,value) => {
+        setFormData((prev) => ({
+            ...prev,
+            serviceTypesSelected: {
+                ...prev.serviceTypesSelected,
+                [serviceName]: value
+            }
+        }))
+}
+
+    const addExtraService = () => {
+        setFormData((prev) => ({
+            ...prev,
+            extraServices: [
+                ...prev.extraServices,
+                {
+                    name: '',
+                    type: 'Theo phòng',
+                    price: ''
+                }
+            ]
+        }))
+    }
+
+    const removeExtraService = (index) => {
+        setFormData((prev) => ({
+            ...prev,
+            extraServices: prev.extraServices.filter(
+                (_, i) => i !== index
+            )
+        }))
+    }
+
+    const updateExtraService = (index, field, value) => {
+        setFormData((prev) => ({
+            ...prev,
+            extraServices: prev.extraServices.map((item, i) =>
+                i === index
+                    ? { ...item, [field]: value }
+                    : item
+            )
+        }))
+    }
     const handleSubmit = (event) => {
         event.preventDefault()
 
@@ -209,7 +279,11 @@ const Contract = () => {
             ...formData,
             deposit: Number(formData.deposit),
             rent: Number(formData.rent),
-            paymentDay: Number(formData.paymentDay)
+            paymentDay: Number(formData.paymentDay),
+
+            extraServices: formData.extraServices.filter(
+                (item) => item.name.trim() !== ''
+            )
         }
 
         if (editingContract) {
@@ -399,11 +473,144 @@ const Contract = () => {
                                         <label key={service.name} className={`grid grid-cols-[56px_1fr_1fr_1fr] items-center px-4 py-3 text-sm ${formData.services.includes(service.name) ? 'text-gray-900' : 'text-gray-400'}`}>
                                             <input type="checkbox" checked={formData.services.includes(service.name)} onChange={() => toggleService(service.name)} className="h-4 w-4 accent-[#80001C]" />
                                             <span>{service.name}</span>
-                                            <span>{service.type}</span>
+                                            <select
+                                                value={
+                                                    formData.serviceTypesSelected?.[
+                                                        service.name
+                                                    ] || service.type
+                                                }
+                                                onChange={(e) =>
+                                                    updateServiceType(
+                                                        service.name,
+                                                        e.target.value
+                                                    )
+                                                }
+                                                disabled={
+                                                    !formData.services.includes(
+                                                        service.name
+                                                    )
+                                                }
+                                                className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm outline-none disabled:bg-gray-100"
+                                            >
+                                                {serviceTypes.map((type) => (
+                                                    <option
+                                                        key={type}
+                                                        value={type}
+                                                    >
+                                                        {type}
+                                                    </option>
+                                                ))}
+                                            </select>
                                             <span className="text-right">{formatMoney(service.price)}</span>
                                         </label>
                                     ))}
                                 </div>
+                                <div className="mt-5">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <p className="text-sm font-bold uppercase text-gray-400">
+                                                Dịch vụ bổ sung
+                                            </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={addExtraService}
+                                        className="flex items-center gap-2 rounded-xl border border-[#80001C]/20 bg-[#FDF2F4] px-3 py-2 text-sm font-medium text-[#80001C] transition-all hover:bg-[#F8E6EA]"
+                                    >
+
+                                        Thêm dịch vụ
+                                    </button>
+                                        </div>
+
+                                        {formData.extraServices.length > 0 && (
+                                            <div className="space-y-3">
+                                                {formData.extraServices.map((service, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                                                    >
+                                                        <div className="mb-3 flex items-center justify-between">
+                                                            <p className="text-sm font-medium text-gray-900">
+                                                                Dịch vụ bổ sung #{index + 1}
+                                                            </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            removeExtraService(index)
+                                        }
+                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 transition-all hover:bg-red-100"
+                                    >
+                                        <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M6 18L18 6M6 6l12 12"
+                                            />
+                                        </svg>
+                                    </button>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Tên dịch vụ"
+                                                                value={service.name}
+                                                                onChange={(e) =>
+                                                                    updateExtraService(
+                                                                        index,
+                                                                        'name',
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E]"
+                                                            />
+
+                                                            <select
+                                                                value={service.type}
+                                                                onChange={(e) =>
+                                                                    updateExtraService(
+                                                                        index,
+                                                                        'type',
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E]"
+                                                            >
+                                                                {serviceTypes.map((type) => (
+                                                                    <option
+                                                                        key={type}
+                                                                        value={type}
+                                                                    >
+                                                                        {type}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Đơn giá"
+                                                                value={service.price}
+                                                                onChange={(e) =>
+                                                                    updateExtraService(
+                                                                        index,
+                                                                        'price',
+                                                                        e.target.value
+                                                                    )
+                                                                }
+                                                                className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                             </div>
 
                             <label className="block">

@@ -475,18 +475,43 @@ const Invoice = () => {
                             </div>
 
                             <div className="rounded-2xl border border-gray-100 p-4">
-                                <h4 className="mb-3 font-bold text-gray-900">Dịch vụ</h4>
+                                <h4 className="mb-3 font-bold text-gray-900">
+                                    Dịch vụ
+                                </h4>
+
                                 <div className="divide-y divide-gray-100">
-                                    <div className="flex items-center justify-between py-2 text-sm">
-                                        <span>Tiền thuê phòng</span>
-                                        <span className="font-semibold">{formatMoney(formData.rent)}</span>
+                                    <div className="flex items-center justify-between py-3 text-sm">
+                                        <span className="font-medium text-gray-700">
+                                            Tiền thuê phòng
+                                        </span>
+
+                                        <span className="font-semibold text-gray-900">
+                                            {formatMoney(formData.rent)}
+                                        </span>
                                     </div>
-                                    {formData.services.map((service, index) => (
-                                        <div key={service.name} className="grid grid-cols-[1fr_140px] gap-3 py-2">
-                                            <input value={service.name} onChange={(event) => updateService(index, 'name', event.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" />
-                                            <input type="number" min={0} value={service.amount} onChange={(event) => updateService(index, 'amount', event.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" />
+
+                                    {formData.services.map((service) => (
+                                        <div
+                                            key={service.name}
+                                            className="flex items-center justify-between py-3 text-sm"
+                                        >
+                                            <span className="font-medium text-gray-700">
+                                                {service.name}
+                                            </span>
+
+                                            <span className="font-semibold text-gray-900">
+                                                {formatMoney(service.amount)}
+                                            </span>
                                         </div>
                                     ))}
+                                </div>
+
+                                <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                                    <p className="text-xs text-gray-500">
+                                        Các dịch vụ được lấy từ hợp đồng và
+                                        không thể chỉnh sửa tại màn hình lập
+                                        hóa đơn.
+                                    </p>
                                 </div>
                             </div>
 
