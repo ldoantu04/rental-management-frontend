@@ -77,8 +77,9 @@ const buildItemsFromInvoice = (invoice) => {
             soLuong: waterQty, donGia: waterPrice,
             amount: waterQty * waterPrice
         })
-    } else if (waterMode === 'THEO_NGUOI') {
-        const people = Number(invoice.waterPeople || 1)
+    } else     if (waterMode === 'THEO_NGUOI') {
+        const stored = Number(invoice.waterPeople)
+        const people = Number.isFinite(stored) && stored > 0 ? stored : 1
         items.push({
             name: 'Tiền nước', unit: 'người', start: '', end: '',
             soLuong: people, donGia: waterPrice,
@@ -93,21 +94,28 @@ const buildItemsFromInvoice = (invoice) => {
     }
 
     const services = Array.isArray(invoice.services) ? invoice.services : []
-    const people = Number(invoice.waterPeople || 1)
     services.forEach((service) => {
         const donGia = Number(service.amount || 0)
         const kieuTinh = (service.kieuTinh || 'Theo phong').toLowerCase()
+        const tenDichVu = (service.name || '').toLowerCase()
+        const isChiSo = kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')
+        const isElectricOrWaterByMeter = isChiSo && (
+            tenDichVu.includes('điện') || tenDichVu.includes('dien') ||
+            tenDichVu.includes('nước') || tenDichVu.includes('nuoc')
+        )
+        if (isElectricOrWaterByMeter) return
+
         let soLuong, unit
         if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
-            soLuong = people
             unit = 'người'
-        } else if (kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')) {
-            soLuong = Number(service.soLuong || 1)
+        } else if (isChiSo) {
             unit = 'Số'
         } else {
-            soLuong = 1
             unit = 'Phòng'
         }
+        const stored = Number(service.soLuong)
+        soLuong = Number.isFinite(stored) && stored > 0 ? stored : 1
+
         items.push({
             name: service.name,
             unit,
@@ -289,6 +297,9 @@ const Invoice = () => {
             amount: Number(s.donGia || 0),
             laTuHopDong: s.laTuHopDong !== false
         }))
+        const roommateCount = (i.hopDong?.khachThue?.danhSachNguoiOCung || []).length
+        const roomPeople = Number(i.hopDong?.phongTro?.soNguoi || 0)
+        const people = roomPeople > 0 ? roomPeople : (roommateCount > 0 ? 1 + roommateCount : 1)
         return {
             id: i.id,
             code: i.maHoaDon,
@@ -304,7 +315,7 @@ const Invoice = () => {
             waterStart: i.chiSoNuocCu == null ? 0 : i.chiSoNuocCu,
             waterEnd: i.chiSoNuocMoi == null ? '' : i.chiSoNuocMoi,
             waterPrice: Number(i.giaNuoc || 0),
-            waterPeople: 1,
+            waterPeople: people,
             services,
             dueDate: i.hanThanhToan || '',
             status: i.trangThai || 'CHUA_THANH_TOAN',

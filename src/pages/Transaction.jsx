@@ -1,52 +1,129 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 import { assets } from '../assets/assets'
+import { RentalContext } from '../context/RentalContext'
+import axios from 'axios'
 import { toast } from 'react-toastify'
 
-const initialTransactions = [
-    { id: 1, code: 'TX001', tenant: 'Nguyễn Văn A', invoice: 'INV002', amount: 3500000, method: 'TRANSFER', date: '2026-06-01', description: 'Thu tiền phòng tháng 05/2026' },
-    { id: 2, code: 'TX002', tenant: 'Nguyễn Văn A', invoice: 'INV002', amount: 3500000, method: 'CASH', date: '2026-06-01', description: 'Thu tiền phòng tháng 05/2026' },
-    { id: 3, code: 'TX003', tenant: 'Trần Thị B', invoice: 'INV003', amount: 3500000, method: 'TRANSFER', date: '2026-06-01', description: 'Thu tiền phòng tháng 05/2026' },
-    { id: 4, code: 'TX004', tenant: 'Lê Văn C', invoice: 'INV004', amount: 3500000, method: 'CASH', date: '2026-06-01', description: 'Thu tiền phòng tháng 05/2026' },
-    { id: 5, code: 'TX005', tenant: 'Phạm Văn D', invoice: 'INV005', amount: 3500000, method: 'TRANSFER', date: '2026-06-01', description: 'Thu tiền phòng tháng 05/2026' }
-]
-
 const methodMeta = {
-    CASH: 'Tiền mặt',
-    TRANSFER: 'Chuyển khoản'
-}
-
-const formatDate = (value) => {
-    if (!value) return '-'
-    const [year, month, day] = value.split('-')
-    return `${day}/${month}/${year}`
+    TIEN_MAT: 'Tiền mặt',
+    TRUC_TUYEN: 'Chuyển khoản'
 }
 
 const formatMoney = (value) => new Intl.NumberFormat('vi-VN').format(Number(value || 0)) + ' VNĐ'
 
+const formatDateTime = (value) => {
+    if (!value) return '-'
+    try {
+        const date = new Date(value)
+        if (isNaN(date.getTime())) return '-'
+        return date.toLocaleString('vi-VN', { hour12: false })
+    } catch (e) {
+        return '-'
+    }
+}
+
+const buildQuery = (params) => {
+    const search = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') return
+        search.append(key, value)
+    })
+    return search.toString()
+}
+
 const Transaction = () => {
-    const [transactions] = useState(initialTransactions)
+
+    const { backendUrl, token } = useContext(RentalContext)
+
+    const [transactions, setTransactions] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [exporting, setExporting] = useState(false)
+
     const [keyword, setKeyword] = useState('')
     const [method, setMethod] = useState('ALL')
     const [timeRange, setTimeRange] = useState('ALL')
 
-    const filteredTransactions = useMemo(() => {
-        const search = keyword.trim().toLowerCase()
+    const rangeBounds = useMemo(() => {
+        if (timeRange === 'ALL') return { tuNgay: null, denNgay: null }
+        const now = new Date()
+        if (timeRange === 'THIS_MONTH') {
+            const tuNgay = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0)
+            const denNgay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+            return { tuNgay: tuNgay.toISOString().slice(0, 19), denNgay: denNgay.toISOString().slice(0, 19) }
+        }
+        if (timeRange === 'LAST_MONTH') {
+            const tuNgay = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0)
+            const denNgay = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+            return { tuNgay: tuNgay.toISOString().slice(0, 19), denNgay: denNgay.toISOString().slice(0, 19) }
+        }
+        return { tuNgay: null, denNgay: null }
+    }, [timeRange])
 
-        return transactions.filter((transaction) => {
-            const matchesSearch =
-                !search ||
-                [transaction.code, transaction.tenant, transaction.invoice, transaction.description].some((value) =>
-                    value.toLowerCase().includes(search)
-                )
-            const matchesMethod = method === 'ALL' || transaction.method === method
+    const fetchTransactions = useCallback(async () => {
+        try {
+            setLoading(true)
+            const query = buildQuery({
+                keyword,
+                hinhThucTT: method === 'ALL' ? null : method,
+                tuNgay: rangeBounds.tuNgay,
+                denNgay: rangeBounds.denNgay
+            })
+            const url = backendUrl + '/api/transactions/search' + (query ? '?' + query : '')
+            const response = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } })
+            setTransactions(response.data || [])
+        } catch (error) {
+            console.log(error)
+            toast.error('Khong the tai danh sach giao dich')
+            setTransactions([])
+        } finally {
+            setLoading(false)
+        }
+    }, [backendUrl, token, keyword, method, rangeBounds])
 
-            return matchesSearch && matchesMethod
-        })
-    }, [keyword, method, transactions])
+    useEffect(() => {
+        if (token) {
+            fetchTransactions()
+        }
+    }, [token, fetchTransactions])
 
-    const countByMethod = (value) => transactions.filter((transaction) => transaction.method === value).length
+    const handleExport = async () => {
+        try {
+            setExporting(true)
+            const query = buildQuery({
+                keyword,
+                hinhThucTT: method === 'ALL' ? null : method,
+                tuNgay: rangeBounds.tuNgay,
+                denNgay: rangeBounds.denNgay
+            })
+            const url = backendUrl + '/api/transactions/export' + (query ? '?' + query : '')
+            const response = await axios.get(url, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            })
+            const blob = new Blob([response.data], { type: response.data.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+            const downloadUrl = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = downloadUrl
+            link.setAttribute('download', 'danh-sach-giao-dich.xlsx')
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(downloadUrl)
+            toast.success('Xuat bao cao thanh cong')
+        } catch (error) {
+            console.log(error)
+            toast.error('Khong the xuat bao cao')
+        } finally {
+            setExporting(false)
+        }
+    }
+
+    const countByMethod = (value) => transactions.filter((transaction) => transaction.hinhThucTT === value).length
+
+    const getInvoiceCode = (tx) => tx?.hoaDon?.maHoaDon || '-'
+    const getTenantName = (tx) => tx?.hoaDon?.hopDong?.khachThue?.hoTen || '-'
 
     return (
         <div className="min-h-screen bg-[#F6F7FB]">
@@ -60,9 +137,9 @@ const Transaction = () => {
                         <p className="mt-1 text-sm text-gray-500">Quản lý các giao dịch thu chi và theo dõi dòng tiền</p>
                     </div>
 
-                    <button type="button" onClick={() => toast.info('Tính năng xuất báo cáo sẽ được nối backend sau')} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50">
+                    <button type="button" onClick={handleExport} disabled={exporting} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 disabled:opacity-60">
                         <img className="h-4 w-4" src={assets.icon_download} alt="" />
-                        Xuất báo cáo
+                        {exporting ? 'Đang xuất...' : 'Xuất báo cáo'}
                     </button>
                 </div>
 
@@ -71,7 +148,7 @@ const Transaction = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium">Tiền mặt</p>
-                                <p className="mt-2 text-3xl font-bold">{countByMethod('CASH')}</p>
+                                <p className="mt-2 text-3xl font-bold">{countByMethod('TIEN_MAT')}</p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500">
                                 <img src={assets.icon_transaction} alt="" className="h-6 w-6 brightness-0 invert" />
@@ -83,7 +160,7 @@ const Transaction = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium">Chuyển khoản</p>
-                                <p className="mt-2 text-3xl font-bold">{countByMethod('TRANSFER')}</p>
+                                <p className="mt-2 text-3xl font-bold">{countByMethod('TRUC_TUYEN')}</p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
                                 <img src={assets.icon_transaction} alt="" className="h-6 w-6 brightness-0 invert" />
@@ -114,35 +191,43 @@ const Transaction = () => {
 
                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1040px]">
+                        <table className="w-full min-w-[900px]">
                             <thead>
                                 <tr className="border-b border-gray-200 bg-gray-50">
                                     <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">Mã GD</th>
                                     <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">Bên giao dịch</th>
                                     <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">Hóa đơn</th>
-                                    <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Số tiền</th>
+                                    <th className="px-5 py-4 text-right text-sm font-semibold text-gray-600">Số tiền</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Phương thức</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Thời gian</th>
                                     <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">Mô tả</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredTransactions.map((transaction) => (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-500">Đang tải dữ liệu...</td>
+                                    </tr>
+                                ) : transactions.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-500">Không có giao dịch nào phù hợp</td>
+                                    </tr>
+                                ) : transactions.map((transaction) => (
                                     <tr key={transaction.id} className="transition-colors hover:bg-gray-50/70">
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF2F4]">
                                                     <img className="h-4 w-4" src={assets.icon_transaction} alt="" />
                                                 </div>
-                                                <span className="text-sm font-semibold text-gray-900">{transaction.code}</span>
+                                                <span className="text-sm font-semibold text-gray-900">{transaction.maGiaoDich || '-'}</span>
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{transaction.tenant}</td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{transaction.invoice}</td>
-                                        <td className="px-5 py-4 text-center text-base text-gray-900">{formatMoney(transaction.amount)}</td>
-                                        <td className="px-5 py-4 text-center text-sm text-gray-700">{methodMeta[transaction.method]}</td>
-                                        <td className="px-5 py-4 text-center text-sm text-gray-700">{formatDate(transaction.date)}</td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{transaction.description}</td>
+                                        <td className="px-5 py-4 text-sm text-gray-700">{getTenantName(transaction)}</td>
+                                        <td className="px-5 py-4 text-sm text-gray-700">{getInvoiceCode(transaction)}</td>
+                                        <td className="px-5 py-4 text-right text-base font-semibold text-gray-900">{formatMoney(transaction.soTien)}</td>
+                                        <td className="px-5 py-4 text-center text-sm text-gray-700">{methodMeta[transaction.hinhThucTT] || '-'}</td>
+                                        <td className="px-5 py-4 text-center text-sm text-gray-700">{formatDateTime(transaction.ngayThanhToan || transaction.ngayTao)}</td>
+                                        <td className="px-5 py-4 text-sm text-gray-700">{transaction.ghiChu || '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>

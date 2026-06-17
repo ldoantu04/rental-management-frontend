@@ -214,33 +214,6 @@ const PaymentTab = () => (
                 ))}
             </div>
 
-            <div className="bg-pink-50 border border-pink-200 rounded-2xl p-6 mb-6">
-                <h3 className="text-base font-medium text-gray-900 mb-6">Cấu hình MoMo</h3>
-                <div className="space-y-4">
-                    <ReadonlyInput label="Mã đối tác (Partner Code)" placeholder="Nhập mã đối tác" />
-                    <ReadonlyInput label="Access Key" placeholder="Nhập access key" />
-                    <ReadonlyInput label="Secret Key" placeholder="Nhập secret key" />
-                    <ReadonlyInput label="Tên tài khoản nhận tiền" placeholder="Nhập tên tài khoản" />
-                    <button type="button" className="w-full h-11 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-                        <Icon name="link" className="w-4 h-4" />
-                        Kết nối MoMo
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-                <h3 className="text-base font-medium text-gray-900 mb-6">Cấu hình VNPay</h3>
-                <div className="space-y-4">
-                    <ReadonlyInput label="Terminal ID" placeholder="Nhập terminal ID" />
-                    <ReadonlyInput label="Hash Secret" placeholder="Nhập hash secret" />
-                    <ReadonlyInput label="URL thanh toán" value="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html" />
-                    <ReadonlyInput label="Tên tài khoản nhận tiền" placeholder="Nhập tên tài khoản" />
-                    <button type="button" className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-                        <Icon name="link" className="w-4 h-4" />
-                        Kết nối VNPay
-                    </button>
-                </div>
-            </div>
         </section>
     </>
 )
