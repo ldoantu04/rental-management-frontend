@@ -1,84 +1,17 @@
-import React, { useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 import { assets } from '../assets/assets'
 import { toast } from 'react-toastify'
-
-const initialRooms = [
-    {
-        id: 1,
-        maPhong: 'P101',
-        nhaTro: 'Nhà trọ Hoàng Long',
-        giaThue: 3500000,
-        dienTich: 25,
-        soNguoiToiDa: 2,
-        tang: 1,
-        trangThai: 'TRONG',
-        ghiChu: 'Phòng có cửa sổ, sẵn sàng cho thuê'
-    },
-    {
-        id: 2,
-        maPhong: 'P102',
-        nhaTro: 'Nhà trọ Hoàng Long',
-        giaThue: 3500000,
-        dienTich: 25,
-        soNguoiToiDa: 2,
-        tang: 1,
-        trangThai: 'DANG_THUE',
-        ghiChu: 'Đang có khách thuê'
-    },
-    {
-        id: 3,
-        maPhong: 'P201',
-        nhaTro: 'Nhà trọ Minh Anh',
-        giaThue: 3800000,
-        dienTich: 28,
-        soNguoiToiDa: 2,
-        tang: 2,
-        trangThai: 'BAO_TRI',
-        ghiChu: 'Đang sửa điều hòa'
-    },
-    {
-        id: 4,
-        maPhong: 'P101',
-        nhaTro: 'Nhà trọ Hoàng Hà',
-        giaThue: 3500000,
-        dienTich: 25,
-        soNguoiToiDa: 3,
-        tang: 1,
-        trangThai: 'TRONG',
-        ghiChu: ''
-    },
-    {
-        id: 5,
-        maPhong: 'P102',
-        nhaTro: 'Nhà trọ Hoàng Hà',
-        giaThue: 3500000,
-        dienTich: 25,
-        soNguoiToiDa: 2,
-        tang: 1,
-        trangThai: 'DANG_THUE',
-        ghiChu: ''
-    },
-    {
-        id: 6,
-        maPhong: 'P201',
-        nhaTro: 'Nhà trọ Minh Khánh',
-        giaThue: 3800000,
-        dienTich: 28,
-        soNguoiToiDa: 2,
-        tang: 2,
-        trangThai: 'BAO_TRI',
-        ghiChu: ''
-    }
-]
+import axios from 'axios'
+import { RentalContext } from '../context/RentalContext'
 
 const emptyForm = {
     maPhong: '',
-    nhaTro: 'Nhà trọ Hoàng Long',
+    maNhaTro: '',
     giaThue: '',
     dienTich: '',
-    soNguoiToiDa: '',
+    soNguoi: '',
     tang: '',
     trangThai: 'TRONG',
     ghiChu: ''
@@ -109,42 +42,92 @@ const statusConfig = {
 }
 
 const Room = () => {
-    const [rooms, setRooms] = useState(initialRooms)
+    const { backendUrl, token } = useContext(RentalContext)
+
+    const [rooms, setRooms] = useState([])
+    const [motels, setMotels] = useState([])
     const [searchKeyword, setSearchKeyword] = useState('')
     const [selectedMotel, setSelectedMotel] = useState('ALL')
     const [selectedStatus, setSelectedStatus] = useState('ALL')
+    const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [editingRoom, setEditingRoom] = useState(null)
+    const [deletingRoom, setDeletingRoom] = useState(null)
     const [formData, setFormData] = useState(emptyForm)
 
-    const motelOptions = useMemo(() => {
-        return [...new Set(rooms.map((room) => room.nhaTro))]
-    }, [rooms])
+    const fetchRooms = async () => {
+        try {
+            const response = await axios.get(backendUrl + '/api/rooms', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setRooms(response.data)
+        } catch (error) {
+            console.log(error)
+            toast.error('Không thể tải danh sách phòng trọ')
+        }
+        setLoading(false)
+    }
+
+    const fetchMotels = async () => {
+        try {
+            const response = await axios.get(backendUrl + '/api/motels', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setMotels(response.data)
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    const searchRooms = async (keyword) => {
+        if (!keyword.trim()) {
+            fetchRooms()
+            return
+        }
+        try {
+            const response = await axios.get(backendUrl + '/api/rooms/search?maPhong=' + keyword, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setRooms(response.data)
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    useEffect(() => {
+        if (token) {
+            fetchRooms()
+            fetchMotels()
+        }
+    }, [token])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (token) {
+                searchRooms(searchKeyword)
+            }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchKeyword])
 
     const roomStats = useMemo(() => {
         return rooms.reduce(
             (stats, room) => ({
                 ...stats,
-                [room.trangThai]: stats[room.trangThai] + 1
+                [room.trangThai]: (stats[room.trangThai] || 0) + 1
             }),
             { TRONG: 0, DANG_THUE: 0, BAO_TRI: 0 }
         )
     }, [rooms])
 
     const filteredRooms = useMemo(() => {
-        const keyword = searchKeyword.trim().toLowerCase()
-
         return rooms.filter((room) => {
-            const matchesKeyword =
-                !keyword ||
-                room.maPhong.toLowerCase().includes(keyword) ||
-                room.nhaTro.toLowerCase().includes(keyword)
-            const matchesMotel = selectedMotel === 'ALL' || room.nhaTro === selectedMotel
+            const matchesMotel = selectedMotel === 'ALL' || room.nhaTro?.id === Number(selectedMotel)
             const matchesStatus = selectedStatus === 'ALL' || room.trangThai === selectedStatus
 
-            return matchesKeyword && matchesMotel && matchesStatus
+            return matchesMotel && matchesStatus
         })
-    }, [rooms, searchKeyword, selectedMotel, selectedStatus])
+    }, [rooms, selectedMotel, selectedStatus])
 
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('vi-VN').format(value) + ' VNĐ'
@@ -152,56 +135,75 @@ const Room = () => {
 
     const openCreateModal = () => {
         setEditingRoom(null)
-        setFormData(emptyForm)
+        setFormData({
+            ...emptyForm,
+            maNhaTro: motels[0]?.id?.toString() || ''
+        })
         setShowModal(true)
     }
 
     const openEditModal = (room) => {
         setEditingRoom(room)
         setFormData({
-            maPhong: room.maPhong,
-            nhaTro: room.nhaTro,
-            giaThue: room.giaThue,
-            dienTich: room.dienTich,
-            soNguoiToiDa: room.soNguoiToiDa,
-            tang: room.tang,
-            trangThai: room.trangThai,
+            maPhong: room.maPhong || '',
+            maNhaTro: room.nhaTro?.id?.toString() || '',
+            giaThue: room.giaThue ?? '',
+            dienTich: room.dienTich ?? '',
+            soNguoi: room.soNguoi ?? '',
+            tang: room.tang ?? '',
+            trangThai: room.trangThai || 'TRONG',
             ghiChu: room.ghiChu || ''
         })
         setShowModal(true)
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
 
         const payload = {
-            ...formData,
+            maNhaTro: Number(formData.maNhaTro),
+            maPhong: formData.maPhong,
             giaThue: Number(formData.giaThue),
             dienTich: Number(formData.dienTich),
-            soNguoiToiDa: Number(formData.soNguoiToiDa),
-            tang: Number(formData.tang)
+            soNguoi: Number(formData.soNguoi),
+            tang: Number(formData.tang),
+            trangThai: formData.trangThai,
+            ghiChu: formData.ghiChu
         }
 
-        if (editingRoom) {
-            setRooms((prevRooms) =>
-                prevRooms.map((room) =>
-                    room.id === editingRoom.id ? { ...payload, id: editingRoom.id } : room
-                )
-            )
-            toast.success('Cập nhật phòng trọ thành công')
-        } else {
-            setRooms((prevRooms) => [{ ...payload, id: Date.now() }, ...prevRooms])
-            toast.success('Thêm phòng trọ thành công')
+        try {
+            if (editingRoom) {
+                await axios.put(backendUrl + '/api/rooms/' + editingRoom.id, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                toast.success('Cập nhật phòng trọ thành công')
+            } else {
+                await axios.post(backendUrl + '/api/rooms', payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                toast.success('Thêm phòng trọ thành công')
+            }
+            setShowModal(false)
+            fetchRooms()
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Có lỗi xảy ra')
         }
-
-        setShowModal(false)
     }
 
-    const handleDelete = (id) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa phòng trọ này?')) return
-
-        setRooms((prevRooms) => prevRooms.filter((room) => room.id !== id))
-        toast.success('Xóa phòng trọ thành công')
+    const handleDelete = async () => {
+        if (!deletingRoom) return
+        try {
+            await axios.delete(backendUrl + '/api/rooms/' + deletingRoom.id, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            toast.success('Xóa phòng trọ thành công')
+            setDeletingRoom(null)
+            fetchRooms()
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Không thể xóa phòng trọ')
+        }
     }
 
     return (
@@ -279,9 +281,9 @@ const Room = () => {
                             className="bg-gray-100 rounded-xl px-3 py-2.5 text-sm text-gray-700 outline-none cursor-pointer"
                         >
                             <option value="ALL">Tất cả nhà trọ</option>
-                            {motelOptions.map((motel) => (
-                                <option key={motel} value={motel}>
-                                    {motel}
+                            {motels.map((motel) => (
+                                <option key={motel.id} value={motel.id}>
+                                    {motel.tenTro}
                                 </option>
                             ))}
                         </select>
@@ -316,7 +318,13 @@ const Room = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredRooms.length === 0 ? (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">
+                                            Đang tải dữ liệu...
+                                        </td>
+                                    </tr>
+                                ) : filteredRooms.length === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">
                                             Chưa có phòng trọ phù hợp
@@ -324,7 +332,7 @@ const Room = () => {
                                     </tr>
                                 ) : (
                                     filteredRooms.map((room) => {
-                                        const config = statusConfig[room.trangThai]
+                                        const config = statusConfig[room.trangThai] || statusConfig.TRONG
 
                                         return (
                                             <tr key={room.id} className="hover:bg-gray-50/70 transition-colors">
@@ -338,12 +346,12 @@ const Room = () => {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-5 py-4 text-sm text-gray-700">{room.nhaTro}</td>
+                                                <td className="px-5 py-4 text-sm text-gray-700">{room.nhaTro?.tenTro || '-'}</td>
                                                 <td className="px-5 py-4 text-sm font-semibold text-gray-900 text-center">
                                                     {formatCurrency(room.giaThue)}
                                                 </td>
                                                 <td className="px-5 py-4 text-sm text-gray-700 text-center">{room.dienTich} m²</td>
-                                                <td className="px-5 py-4 text-sm text-gray-700 text-center">{room.soNguoiToiDa} người</td>
+                                                <td className="px-5 py-4 text-sm text-gray-700 text-center">{room.soNguoi} người</td>
                                                 <td className="px-5 py-4 text-center">
                                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${config.pillClass}`}>
                                                         <span className={`w-2 h-2 rounded-full ${config.dotClass}`} />
@@ -364,7 +372,7 @@ const Room = () => {
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleDelete(room.id)}
+                                                            onClick={() => setDeletingRoom(room)}
                                                             className="text-red-600 hover:opacity-70 transition-opacity"
                                                             aria-label="Xóa phòng"
                                                         >
@@ -419,13 +427,14 @@ const Room = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Nhà trọ</label>
                                     <select
-                                        value={formData.nhaTro}
-                                        onChange={(e) => setFormData({ ...formData, nhaTro: e.target.value })}
+                                        value={formData.maNhaTro}
+                                        onChange={(e) => setFormData({ ...formData, maNhaTro: e.target.value })}
                                         className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E] transition-all bg-white cursor-pointer"
+                                        required
                                     >
-                                        {motelOptions.map((motel) => (
-                                            <option key={motel} value={motel}>
-                                                {motel}
+                                        {motels.map((motel) => (
+                                            <option key={motel.id} value={motel.id}>
+                                                {motel.tenTro}
                                             </option>
                                         ))}
                                     </select>
@@ -465,8 +474,8 @@ const Room = () => {
                                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Số người tối đa</label>
                                     <input
                                         type="number"
-                                        value={formData.soNguoiToiDa}
-                                        onChange={(e) => setFormData({ ...formData, soNguoiToiDa: e.target.value })}
+                                        value={formData.soNguoi}
+                                        onChange={(e) => setFormData({ ...formData, soNguoi: e.target.value })}
                                         placeholder="Số người"
                                         className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E] transition-all"
                                         min={1}
@@ -530,6 +539,33 @@ const Room = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {deletingRoom && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <h3 className="text-lg font-bold text-gray-900">Xác nhận xóa phòng trọ</h3>
+                        <p className="mt-3 text-sm leading-6 text-gray-500">
+                            Bạn có chắc chắn muốn xóa phòng trọ <span className="font-semibold text-gray-900">{deletingRoom.maPhong}</span>? Hành động này không thể hoàn tác.
+                        </p>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setDeletingRoom(null)}
+                                className="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="rounded-xl bg-[#80001C] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#6B0018]"
+                            >
+                                Xác nhận
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

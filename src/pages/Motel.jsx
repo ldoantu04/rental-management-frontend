@@ -16,6 +16,7 @@ const Motel = () => {
     // Modal states
     const [showModal, setShowModal] = useState(false)
     const [editingMotel, setEditingMotel] = useState(null)
+    const [deletingMotel, setDeletingMotel] = useState(null)
     const [formData, setFormData] = useState({
         tenTro: '',
         diaChi: '',
@@ -122,13 +123,14 @@ const Motel = () => {
         }
     }
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa nhà trọ này?')) return
+    const handleDelete = async () => {
+        if (!deletingMotel) return
         try {
-            await axios.delete(backendUrl + '/api/motels/' + id, {
+            await axios.delete(backendUrl + '/api/motels/' + deletingMotel.id, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             toast.success('Xóa nhà trọ thành công')
+            setDeletingMotel(null)
             fetchMotels()
         } catch (error) {
             console.log(error)
@@ -244,7 +246,7 @@ const Motel = () => {
                                                         </svg>
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(motel.id)}
+                                                        onClick={() => setDeletingMotel(motel)}
                                                         className="text-red-500 hover:opacity-70 transition-opacity"
                                                     >
                                                         <svg className='w-4 h-4 text-red-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -368,6 +370,33 @@ const Motel = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {deletingMotel && (
+                <div className='fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4'>
+                    <div className='bg-white rounded-2xl shadow-xl w-full max-w-md p-6'>
+                        <h3 className='text-lg font-bold text-gray-900'>Xác nhận xóa nhà trọ</h3>
+                        <p className='mt-3 text-sm leading-6 text-gray-500'>
+                            Bạn có chắc chắn muốn xóa nhà trọ <span className='font-semibold text-gray-900'>{deletingMotel.tenTro}</span>? Hành động này không thể hoàn tác.
+                        </p>
+                        <div className='mt-6 flex justify-end gap-3'>
+                            <button
+                                type='button'
+                                onClick={() => setDeletingMotel(null)}
+                                className='rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50'
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type='button'
+                                onClick={handleDelete}
+                                className='rounded-xl bg-[#80001C] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#6B0018]'
+                            >
+                                Xác nhận
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

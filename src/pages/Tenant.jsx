@@ -1,144 +1,42 @@
-import React, { useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 import { assets } from '../assets/assets'
 import { toast } from 'react-toastify'
-
-const initialTenants = [
-    {
-        id: 1,
-        name: 'Nguyễn Văn An',
-        birthDate: '1998-04-12',
-        cccd: '001234567890',
-        phone: '0912345678',
-        email: 'nguyenvanan@email.com',
-        room: 'P101 - Nhà trọ Hoàng Long',
-        startDate: '2026-01-01',
-        deposit: 7000000,
-        roommates: [{ name: 'Nguyễn Thị B', relation: 'Vợ', cccd: '001234567899' }],
-        documents: '',
-        status: 'RENTING'
-    },
-    {
-        id: 2,
-        name: 'Trần Thị Bích',
-        birthDate: '1999-08-20',
-        cccd: '001234567891',
-        phone: '0912345679',
-        email: 'bich.tt@email.com',
-        room: 'P102 - Nhà trọ Hoàng Long',
-        startDate: '2026-01-01',
-        deposit: 7000000,
-        roommates: [{ name: 'Trần Văn Bình', relation: 'Em', cccd: '001234567898' }],
-        documents: '',
-        status: 'RENTING'
-    },
-    {
-        id: 3,
-        name: 'Lê Văn Cường',
-        birthDate: '1997-03-02',
-        cccd: '001234567892',
-        phone: '0912345680',
-        email: 'cuong.lv@email.com',
-        room: 'P201 - Nhà trọ Minh Anh',
-        startDate: '2026-02-01',
-        deposit: 7600000,
-        roommates: [
-            { name: 'Lê Thị Hạnh', relation: 'Chị', cccd: '001234567897' },
-            { name: 'Lê Văn Minh', relation: 'Bạn', cccd: '001234567896' }
-        ],
-        documents: '',
-        status: 'RENTING'
-    },
-    {
-        id: 4,
-        name: 'Phạm Thị Dung',
-        birthDate: '2000-11-09',
-        cccd: '001234567893',
-        phone: '0912345681',
-        email: 'dung.pt@email.com',
-        room: 'P101 - Nhà trọ Hoàng Hà',
-        startDate: '2026-02-15',
-        deposit: 7000000,
-        roommates: [{ name: 'Phạm Văn Duy', relation: 'Anh', cccd: '001234567895' }],
-        documents: '',
-        status: 'RENTING'
-    },
-    {
-        id: 5,
-        name: 'Hoàng Thị Em',
-        birthDate: '1996-06-18',
-        cccd: '001234567894',
-        phone: '0912345682',
-        email: 'em.ht@email.com',
-        room: 'P102 - Nhà trọ Hoàng Hà',
-        startDate: '2026-03-01',
-        deposit: 7000000,
-        roommates: [{ name: 'Hoàng Văn Khoa', relation: 'Chồng', cccd: '001234567894' }],
-        documents: '',
-        status: 'RENTING'
-    },
-    {
-        id: 6,
-        name: 'Võ Văn F',
-        birthDate: '1995-12-04',
-        cccd: '001234567895',
-        phone: '0912345683',
-        email: 'f.vv@email.com',
-        room: 'P201 - Nhà trọ Minh Khánh',
-        startDate: '2026-03-01',
-        deposit: 7600000,
-        roommates: [{ name: 'Võ Thị G', relation: 'Em', cccd: '001234567893' }],
-        documents: '',
-        status: 'UNPAID'
-    }
-]
-
-const emptyTenant = {
-    name: '',
-    birthDate: '',
-    cccd: '',
-    phone: '',
-    email: '',
-    room: 'P101 - Nhà trọ Hoàng Long',
-    startDate: '',
-    deposit: '',
-    roommates: [{ name: '', relation: '', cccd: '' }],
-    documents: '',
-    status: 'RENTING'
-}
-
-const rooms = [
-    'P101 - Nhà trọ Hoàng Long',
-    'P102 - Nhà trọ Hoàng Long',
-    'P201 - Nhà trọ Minh Anh',
-    'P101 - Nhà trọ Hoàng Hà',
-    'P102 - Nhà trọ Hoàng Hà',
-    'P201 - Nhà trọ Minh Khánh'
-]
+import axios from 'axios'
+import { RentalContext } from '../context/RentalContext'
 
 const statusConfig = {
-    RENTING: {
+    CHUA_NHAN_PHONG: {
+        label: 'Chưa nhận phòng',
+        pillClass: 'bg-red-50 text-red-600',
+        dotClass: 'bg-red-500'
+    },
+    DANG_THUE: {
         label: 'Đang thuê',
         pillClass: 'bg-green-50 text-green-600',
         dotClass: 'bg-green-500'
     },
-    UNPAID: {
-        label: 'Chưa thanh toán',
-        pillClass: 'bg-red-50 text-red-600',
-        dotClass: 'bg-red-500'
+    DA_CHUYEN_DI: {
+        label: 'Đã chuyển đi',
+        pillClass: 'bg-gray-100 text-gray-600',
+        dotClass: 'bg-gray-500'
     }
 }
 
 const formatDate = (value) => {
     if (!value) return '-'
-    const [year, month, day] = value.split('-')
+    const date = new Date(value)
+    if (isNaN(date.getTime())) return value
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
     return `${day}/${month}/${year}`
 }
 
 const formatMoney = (value) => new Intl.NumberFormat('vi-VN').format(Number(value || 0)) + ' VNĐ'
 
-const ConfirmDialog = ({ title, message, onCancel, onConfirm }) => (
+const ConfirmDialog = ({ title, message, confirmText = 'Xác nhận', onCancel, onConfirm }) => (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-bold text-gray-900">{title}</h3>
@@ -156,48 +54,135 @@ const ConfirmDialog = ({ title, message, onCancel, onConfirm }) => (
                     onClick={onConfirm}
                     className="rounded-xl bg-[#80001C] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#6B0018]"
                 >
-                    Xác nhận
+                    {confirmText}
                 </button>
             </div>
         </div>
     </div>
 )
 
+const emptyRoommate = { hoTen: '', quanHe: '', cccd: '', sdt: '' }
+
+const mapTenant = (t) => ({
+    id: t.id,
+    hoTen: t.hoTen || '',
+    ngaySinh: t.ngaySinh || '',
+    gioiTinh: t.gioiTinh || null,
+    cccd: t.cccd || '',
+    sdt: t.sdt || '',
+    email: t.email || '',
+    diaChi: t.diaChi || '',
+    anhGiayTo: Array.isArray(t.anhGiayTo) ? t.anhGiayTo : [],
+    danhSachNguoiOCung: Array.isArray(t.danhSachNguoiOCung) ? t.danhSachNguoiOCung : [],
+    phongTro: t.phongTro || null,
+    ngayBatDauThue: t.ngayBatDauThue || null,
+    tienCoc: t.tienCoc != null ? t.tienCoc : null,
+    trangThai: t.trangThai || 'CHUA_NHAN_PHONG',
+    ghiChu: t.ghiChu || ''
+})
+
+const uploadImageFile = async (file, backendUrl, token) => {
+    const formDataUpload = new FormData()
+    formDataUpload.append('file', file)
+    const response = await axios.post(backendUrl + '/api/upload/image', formDataUpload, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+        }
+    })
+    return response.data?.url
+}
+
 const Tenant = () => {
-    const [tenants, setTenants] = useState(initialTenants)
+    const { backendUrl, token } = useContext(RentalContext)
+
+    const [tenants, setTenants] = useState([])
     const [keyword, setKeyword] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [editingTenant, setEditingTenant] = useState(null)
     const [detailTenant, setDetailTenant] = useState(null)
-    const [deletingTenant, setDeletingTenant] = useState(null)
-    const [formData, setFormData] = useState(emptyTenant)
+    const [movingOutTenant, setMovingOutTenant] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [uploadingDoc, setUploadingDoc] = useState(false)
+    const [formData, setFormData] = useState({
+        hoTen: '',
+        ngaySinh: '',
+        gioiTinh: null,
+        cccd: '',
+        sdt: '',
+        email: '',
+        diaChi: '',
+        ghiChu: '',
+        anhGiayTo: [],
+        danhSachNguoiOCung: [{ ...emptyRoommate }]
+    })
+
+    const fetchTenants = async () => {
+        try {
+            const response = await axios.get(backendUrl + '/api/tenants', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setTenants((response.data || []).map(mapTenant))
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Không thể tải danh sách khách thuê')
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        if (token) {
+            setLoading(true)
+            fetchTenants()
+        }
+    }, [token])
 
     const filteredTenants = useMemo(() => {
         const search = keyword.trim().toLowerCase()
         if (!search) return tenants
-
         return tenants.filter((tenant) =>
-            [tenant.name, tenant.cccd, tenant.phone, tenant.room].some((value) =>
-                value.toLowerCase().includes(search)
+            [tenant.hoTen, tenant.cccd, tenant.sdt, tenant.email].some((value) =>
+                value && value.toLowerCase().includes(search)
             )
         )
     }, [keyword, tenants])
 
-    const rentingCount = tenants.filter((tenant) => tenant.status === 'RENTING').length
-    const unpaidCount = tenants.filter((tenant) => tenant.status === 'UNPAID').length
+    const rentingCount = tenants.filter((tenant) => tenant.trangThai === 'DANG_THUE').length
+    const unpaidCount = tenants.filter((tenant) => tenant.trangThai === 'CHUA_NHAN_PHONG').length
 
     const openCreateModal = () => {
         setEditingTenant(null)
-        setFormData(emptyTenant)
+        setFormData({
+            hoTen: '',
+            ngaySinh: '',
+            gioiTinh: null,
+            cccd: '',
+            sdt: '',
+            email: '',
+            diaChi: '',
+            ghiChu: '',
+            anhGiayTo: [],
+            danhSachNguoiOCung: [{ ...emptyRoommate }]
+        })
         setShowForm(true)
     }
 
     const openEditModal = (tenant) => {
         setEditingTenant(tenant)
         setFormData({
-            ...tenant,
-            deposit: String(tenant.deposit),
-            roommates: tenant.roommates.length ? tenant.roommates : [{ name: '', relation: '', cccd: '' }]
+            hoTen: tenant.hoTen || '',
+            ngaySinh: tenant.ngaySinh || '',
+            gioiTinh: tenant.gioiTinh || null,
+            cccd: tenant.cccd || '',
+            sdt: tenant.sdt || '',
+            email: tenant.email || '',
+            diaChi: tenant.diaChi || '',
+            ghiChu: tenant.ghiChu || '',
+            anhGiayTo: tenant.anhGiayTo || [],
+            danhSachNguoiOCung: tenant.danhSachNguoiOCung.length
+                ? tenant.danhSachNguoiOCung.map((r) => ({ hoTen: r.hoTen || '', quanHe: r.quanHe || '', cccd: r.cccd || '', sdt: r.sdt || '' }))
+                : [{ ...emptyRoommate }]
         })
         setShowForm(true)
     }
@@ -205,7 +190,7 @@ const Tenant = () => {
     const updateRoommate = (index, field, value) => {
         setFormData((prev) => ({
             ...prev,
-            roommates: prev.roommates.map((roommate, currentIndex) =>
+            danhSachNguoiOCung: prev.danhSachNguoiOCung.map((roommate, currentIndex) =>
                 currentIndex === index ? { ...roommate, [field]: value } : roommate
             )
         }))
@@ -214,43 +199,105 @@ const Tenant = () => {
     const addRoommate = () => {
         setFormData((prev) => ({
             ...prev,
-            roommates: [...prev.roommates, { name: '', relation: '', cccd: '' }]
+            danhSachNguoiOCung: [...prev.danhSachNguoiOCung, { ...emptyRoommate }]
         }))
     }
 
     const removeRoommate = (index) => {
         setFormData((prev) => ({
             ...prev,
-            roommates: prev.roommates.filter((_, currentIndex) => currentIndex !== index)
+            danhSachNguoiOCung: prev.danhSachNguoiOCung.filter((_, currentIndex) => currentIndex !== index)
         }))
     }
 
-    const handleSubmit = (event) => {
-        event.preventDefault()
-
-        const payload = {
-            ...formData,
-            deposit: Number(formData.deposit),
-            roommates: formData.roommates.filter((roommate) => roommate.name || roommate.relation || roommate.cccd)
+    const handleDocumentUpload = async (event) => {
+        const files = Array.from(event.target.files || [])
+        if (files.length === 0) return
+        setUploadingDoc(true)
+        try {
+            const uploadedUrls = []
+            for (const file of files) {
+                const url = await uploadImageFile(file, backendUrl, token)
+                if (url) uploadedUrls.push(url)
+            }
+            if (uploadedUrls.length > 0) {
+                setFormData((prev) => ({ ...prev, anhGiayTo: [...(prev.anhGiayTo || []), ...uploadedUrls] }))
+                toast.success(`Đã tải lên ${uploadedUrls.length} ảnh giấy tờ`)
+            }
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Không thể tải ảnh lên')
+        } finally {
+            setUploadingDoc(false)
+            event.target.value = ''
         }
-
-        if (editingTenant) {
-            setTenants((prev) =>
-                prev.map((tenant) => (tenant.id === editingTenant.id ? { ...payload, id: editingTenant.id } : tenant))
-            )
-            toast.success('Cập nhật khách thuê thành công')
-        } else {
-            setTenants((prev) => [{ ...payload, id: Date.now() }, ...prev])
-            toast.success('Thêm khách thuê thành công')
-        }
-
-        setShowForm(false)
     }
 
-    const confirmDelete = () => {
-        setTenants((prev) => prev.filter((tenant) => tenant.id !== deletingTenant.id))
-        setDeletingTenant(null)
-        toast.success('Xóa khách thuê thành công')
+    const removeDocumentImage = (index) => {
+        setFormData((prev) => ({
+            ...prev,
+            anhGiayTo: prev.anhGiayTo.filter((_, currentIndex) => currentIndex !== index)
+        }))
+    }
+
+    const buildPayload = () => ({
+        hoTen: formData.hoTen || null,
+        ngaySinh: formData.ngaySinh || null,
+        gioiTinh: formData.gioiTinh || null,
+        cccd: formData.cccd || null,
+        sdt: formData.sdt || null,
+        email: formData.email || null,
+        diaChi: formData.diaChi || null,
+        ghiChu: formData.ghiChu || null,
+        anhGiayTo: formData.anhGiayTo || [],
+        danhSachNguoiOCung: (formData.danhSachNguoiOCung || []).filter((r) => r.hoTen && r.hoTen.trim() !== '')
+    })
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
+        setSubmitting(true)
+        const payload = buildPayload()
+        try {
+            if (editingTenant) {
+                await axios.put(backendUrl + '/api/tenants/' + editingTenant.id, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                toast.success('Cập nhật khách thuê thành công')
+            } else {
+                await axios.post(backendUrl + '/api/tenants', payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                toast.success('Thêm khách thuê thành công')
+            }
+            setShowForm(false)
+            await fetchTenants()
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Có lỗi xảy ra')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const confirmMoveOut = async () => {
+        if (!movingOutTenant) return
+        try {
+            await axios.put(backendUrl + '/api/tenants/' + movingOutTenant.id + '/move-out', {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            toast.success('Đã cập nhật khách trả phòng thành công')
+            setMovingOutTenant(null)
+            await fetchTenants()
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || 'Không thể cập nhật trạng thái khách thuê')
+        }
+    }
+
+    const roomLabel = (room) => {
+        if (!room) return '-'
+        const motelName = room.nhaTro?.tenTro
+        return motelName ? `${room.maPhong} - ${motelName}` : (room.maPhong || '-')
     }
 
     return (
@@ -303,7 +350,7 @@ const Tenant = () => {
                     <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700 shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium">Chưa thanh toán</p>
+                                <p className="text-sm font-medium">Chưa nhận phòng</p>
                                 <p className="mt-2 text-3xl font-bold">{unpaidCount}</p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500">
@@ -344,42 +391,58 @@ const Tenant = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredTenants.map((tenant) => (
-                                    <tr key={tenant.id} className="transition-colors hover:bg-gray-50/70">
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF2F4]">
-                                                    <img className="h-4 w-4" src={assets.icon_tenant} alt="" />
-                                                </div>
-                                                <span className="text-sm font-semibold text-gray-900">{tenant.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{tenant.cccd}</td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{tenant.phone}</td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{tenant.room}</td>
-                                        <td className="px-5 py-4 text-sm text-gray-700">{formatDate(tenant.startDate)}</td>
-                                        <td className="px-5 py-4 text-center text-sm text-gray-700">{tenant.roommates.length}</td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusConfig[tenant.status].pillClass}`}>
-                                                <span className={`h-2 w-2 rounded-full ${statusConfig[tenant.status].dotClass}`} />
-                                                {statusConfig[tenant.status].label}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center justify-center gap-3">
-                                                <button type="button" onClick={() => setDetailTenant(tenant)} className="hover:opacity-70" aria-label="Xem chi tiết khách thuê">
-                                                    <img className="h-4 w-4" src={assets.icon_xemchitiet} alt="" />
-                                                </button>
-                                                <button type="button" onClick={() => openEditModal(tenant)} className="hover:opacity-70" aria-label="Sửa khách thuê">
-                                                    <img className="h-4 w-4" src={assets.icon_sua} alt="" />
-                                                </button>
-                                                <button type="button" onClick={() => setDeletingTenant(tenant)} className="hover:opacity-70" aria-label="Xóa khách thuê">
-                                                    <img className="h-4 w-4" src={assets.icon_xoa} alt="" />
-                                                </button>
-                                            </div>
-                                        </td>
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-5 py-12 text-center text-sm text-gray-400">Đang tải dữ liệu...</td>
                                     </tr>
-                                ))}
+                                ) : filteredTenants.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-5 py-12 text-center text-sm text-gray-400">Chưa có khách thuê nào</td>
+                                    </tr>
+                                ) : (
+                                    filteredTenants.map((tenant) => {
+                                        const config = statusConfig[tenant.trangThai] || statusConfig.CHUA_NHAN_PHONG
+                                        const hasContract = tenant.trangThai === 'DANG_THUE' && tenant.phongTro
+                                        return (
+                                            <tr key={tenant.id} className="transition-colors hover:bg-gray-50/70">
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF2F4]">
+                                                            <img className="h-4 w-4" src={assets.icon_tenant} alt="" />
+                                                        </div>
+                                                        <span className="text-sm font-semibold text-gray-900">{tenant.hoTen}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4 text-sm text-gray-700">{tenant.cccd || '-'}</td>
+                                                <td className="px-5 py-4 text-sm text-gray-700">{tenant.sdt || '-'}</td>
+                                                <td className="px-5 py-4 text-sm text-gray-700">{hasContract ? roomLabel(tenant.phongTro) : '-'}</td>
+                                                <td className="px-5 py-4 text-sm text-gray-700">{hasContract ? formatDate(tenant.ngayBatDauThue) : '-'}</td>
+                                                <td className="px-5 py-4 text-center text-sm text-gray-700">{tenant.danhSachNguoiOCung.length}</td>
+                                                <td className="px-5 py-4 text-center">
+                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${config.pillClass}`}>
+                                                        <span className={`h-2 w-2 rounded-full ${config.dotClass}`} />
+                                                        {config.label}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center justify-center gap-3">
+                                                        <button type="button" onClick={() => setDetailTenant(tenant)} className="hover:opacity-70" aria-label="Xem chi tiết khách thuê">
+                                                            <img className="h-4 w-4" src={assets.icon_xemchitiet} alt="" />
+                                                        </button>
+                                                        <button type="button" onClick={() => openEditModal(tenant)} className="hover:opacity-70" aria-label="Sửa khách thuê">
+                                                            <img className="h-4 w-4" src={assets.icon_sua} alt="" />
+                                                        </button>
+                                                        {tenant.trangThai !== 'DA_CHUYEN_DI' && (
+                                                            <button type="button" onClick={() => setMovingOutTenant(tenant)} className="hover:opacity-70" aria-label="Khách trả phòng">
+                                                                <img className="h-4 w-4" src={assets.icon_xoa} alt="" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -404,11 +467,11 @@ const Tenant = () => {
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Họ và tên *</span>
-                                        <input required value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Nguyễn Văn A" />
+                                        <input required value={formData.hoTen} onChange={(event) => setFormData({ ...formData, hoTen: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Nguyễn Văn A" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Ngày sinh</span>
-                                        <input type="date" value={formData.birthDate} onChange={(event) => setFormData({ ...formData, birthDate: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" />
+                                        <input type="date" value={formData.ngaySinh || ''} onChange={(event) => setFormData({ ...formData, ngaySinh: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Số CCCD *</span>
@@ -416,15 +479,15 @@ const Tenant = () => {
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Số điện thoại</span>
-                                        <input value={formData.phone} onChange={(event) => setFormData({ ...formData, phone: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="0123454523" />
+                                        <input value={formData.sdt} onChange={(event) => setFormData({ ...formData, sdt: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="0123454523" />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Email</span>
                                         <input type="email" value={formData.email} onChange={(event) => setFormData({ ...formData, email: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="email@gmail.com" />
                                     </label>
                                     <label className="block">
-                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Tiền cọc (VNĐ)</span>
-                                        <input type="number" min={0} value={formData.deposit} onChange={(event) => setFormData({ ...formData, deposit: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="7000000" />
+                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Địa chỉ</span>
+                                        <input value={formData.diaChi} onChange={(event) => setFormData({ ...formData, diaChi: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Địa chỉ thường trú" />
                                     </label>
                                 </div>
                             </div>
@@ -438,11 +501,11 @@ const Tenant = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    {formData.roommates.map((roommate, index) => (
+                                    {formData.danhSachNguoiOCung.map((roommate, index) => (
                                         <div key={index} className="rounded-xl bg-gray-50 p-3">
                                             <div className="mb-2 flex items-center justify-between">
                                                 <p className="text-xs font-semibold uppercase text-gray-500">Người ở cùng #{index + 1}</p>
-                                                {formData.roommates.length > 1 && (
+                                                {formData.danhSachNguoiOCung.length > 1 && (
                                                     <button type="button" onClick={() => removeRoommate(index)} className="flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-white text-[#80001C] transition-colors hover:bg-red-50" aria-label="Xóa người ở cùng">
                                                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -450,18 +513,22 @@ const Tenant = () => {
                                                     </button>
                                                 )}
                                             </div>
-                                            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Họ và tên</span>
-                                                    <input value={roommate.name} onChange={(event) => updateRoommate(index, 'name', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Họ và tên" />
+                                                    <input value={roommate.hoTen} onChange={(event) => updateRoommate(index, 'hoTen', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Họ và tên" />
                                                 </label>
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Quan hệ</span>
-                                                    <input value={roommate.relation} onChange={(event) => updateRoommate(index, 'relation', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Quan hệ" />
+                                                    <input value={roommate.quanHe} onChange={(event) => updateRoommate(index, 'quanHe', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Quan hệ" />
                                                 </label>
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Số CCCD</span>
                                                     <input value={roommate.cccd} onChange={(event) => updateRoommate(index, 'cccd', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Số CCCD" />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="mb-1 block text-xs font-medium text-gray-500">Số điện thoại</span>
+                                                    <input value={roommate.sdt} onChange={(event) => updateRoommate(index, 'sdt', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Số điện thoại" />
                                                 </label>
                                             </div>
                                         </div>
@@ -469,17 +536,58 @@ const Tenant = () => {
                                 </div>
                             </div>
 
+                            <div>
+                                <div className="mb-3 flex items-center justify-between">
+                                    <p className="text-sm font-bold uppercase text-gray-400">Ảnh giấy tờ</p>
+                                    <label className="cursor-pointer rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-[#80001C] hover:bg-red-100">
+                                        {uploadingDoc ? 'Đang tải lên...' : 'Tải ảnh lên'}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            disabled={uploadingDoc}
+                                            onChange={handleDocumentUpload}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                </div>
+
+                                {formData.anhGiayTo.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                                        {formData.anhGiayTo.map((url, index) => (
+                                            <div key={`${url}-${index}`} className="group relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                                                <img src={url} alt={`Ảnh giấy tờ ${index + 1}`} className="h-32 w-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeDocumentImage(index)}
+                                                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#80001C] shadow-sm transition-opacity hover:bg-white"
+                                                    aria-label="Xóa ảnh"
+                                                >
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-xs text-gray-400">
+                                        Chưa có ảnh giấy tờ nào
+                                    </div>
+                                )}
+                            </div>
+
                             <label className="block">
-                                <span className="mb-1.5 block text-sm font-medium text-gray-700">Ảnh giấy tờ</span>
-                                <input type="file" multiple onChange={(event) => setFormData({ ...formData, documents: Array.from(event.target.files).map((file) => file.name).join(', ') })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700" />
+                                <span className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú</span>
+                                <textarea rows={3} value={formData.ghiChu} onChange={(event) => setFormData({ ...formData, ghiChu: event.target.value })} className="w-full resize-none rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Nhập ghi chú (tùy chọn)" />
                             </label>
 
                             <div className="flex gap-3 border-t border-gray-100 pt-4">
                                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                     Hủy
                                 </button>
-                                <button type="submit" className="flex-1 rounded-xl bg-[#80001C] py-2.5 text-sm font-medium text-white hover:bg-[#6B0018]">
-                                    {editingTenant ? 'Cập nhật' : 'Thêm mới'}
+                                <button type="submit" disabled={submitting} className="flex-1 rounded-xl bg-[#80001C] py-2.5 text-sm font-medium text-white hover:bg-[#6B0018] disabled:opacity-60">
+                                    {submitting ? 'Đang xử lý...' : (editingTenant ? 'Cập nhật' : 'Thêm mới')}
                                 </button>
                             </div>
                         </form>
@@ -501,12 +609,18 @@ const Tenant = () => {
 
                         <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
                             <div className="flex items-center gap-4">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#80001C] text-xl font-bold text-white">{detailTenant.name.charAt(0)}</div>
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#80001C] text-xl font-bold text-white">
+                                    {(detailTenant.hoTen || '?').charAt(0)}
+                                </div>
                                 <div>
-                                    <p className="text-lg font-bold text-gray-900">{detailTenant.name}</p>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700">{detailTenant.room}</span>
-                                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusConfig[detailTenant.status].pillClass}`}>{statusConfig[detailTenant.status].label}</span>
+                                    <p className="text-lg font-bold text-gray-900">{detailTenant.hoTen}</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        {detailTenant.trangThai === 'DANG_THUE' && detailTenant.phongTro && (
+                                            <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700">{roomLabel(detailTenant.phongTro)}</span>
+                                        )}
+                                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${(statusConfig[detailTenant.trangThai] || statusConfig.CHUA_NHAN_PHONG).pillClass}`}>
+                                            {(statusConfig[detailTenant.trangThai] || statusConfig.CHUA_NHAN_PHONG).label}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -515,36 +629,68 @@ const Tenant = () => {
                         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
                             {[
                                 ['Số CCCD', detailTenant.cccd],
-                                ['Số điện thoại', detailTenant.phone],
+                                ['Số điện thoại', detailTenant.sdt],
                                 ['Email', detailTenant.email],
-                                ['Ngày bắt đầu thuê', formatDate(detailTenant.startDate)],
-                                ['Ngày sinh', formatDate(detailTenant.birthDate)],
-                                ['Tiền cọc', formatMoney(detailTenant.deposit)]
+                                ['Địa chỉ', detailTenant.diaChi],
+                                ['Ngày sinh', formatDate(detailTenant.ngaySinh)],
+                                ['Phòng thuê', detailTenant.trangThai === 'DANG_THUE' && detailTenant.phongTro ? roomLabel(detailTenant.phongTro) : '-'],
+                                ['Ngày bắt đầu thuê', detailTenant.trangThai === 'DANG_THUE' ? formatDate(detailTenant.ngayBatDauThue) : '-'],
+                                ['Tiền cọc', detailTenant.trangThai === 'DANG_THUE' ? formatMoney(detailTenant.tienCoc) : '-']
                             ].map(([label, value]) => (
                                 <div key={label} className="rounded-xl bg-gray-50 p-4">
                                     <p className="text-xs font-medium text-gray-400">{label}</p>
-                                    <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
+                                    <p className="mt-1 text-sm font-semibold text-gray-900">{value || '-'}</p>
                                 </div>
                             ))}
                         </div>
 
-                        <div className="mt-5">
-                            <p className="mb-3 text-sm font-bold uppercase text-gray-400">Người ở cùng ({detailTenant.roommates.length})</p>
-                            <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
-                                <div className="grid grid-cols-3 px-4 py-3 text-xs font-medium text-gray-400">
-                                    <span>Họ và tên</span>
-                                    <span>Quan hệ</span>
-                                    <span>Số CCCD</span>
-                                </div>
-                                {detailTenant.roommates.map((roommate) => (
-                                    <div key={`${roommate.name}-${roommate.cccd}`} className="grid grid-cols-3 border-t border-gray-100 px-4 py-3 text-sm text-gray-900">
-                                        <span>{roommate.name}</span>
-                                        <span>{roommate.relation}</span>
-                                        <span>{roommate.cccd}</span>
+                        {detailTenant.danhSachNguoiOCung.length > 0 && (
+                            <div className="mt-5">
+                                <p className="mb-3 text-sm font-bold uppercase text-gray-400">Người ở cùng ({detailTenant.danhSachNguoiOCung.length})</p>
+                                <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                                    <div className="grid grid-cols-4 px-4 py-3 text-xs font-medium text-gray-400">
+                                        <span>Họ và tên</span>
+                                        <span>Quan hệ</span>
+                                        <span>Số CCCD</span>
+                                        <span>Số điện thoại</span>
                                     </div>
-                                ))}
+                                    {detailTenant.danhSachNguoiOCung.map((roommate, index) => (
+                                        <div key={`${roommate.hoTen}-${index}`} className="grid grid-cols-4 border-t border-gray-100 px-4 py-3 text-sm text-gray-900">
+                                            <span>{roommate.hoTen}</span>
+                                            <span>{roommate.quanHe || '-'}</span>
+                                            <span>{roommate.cccd || '-'}</span>
+                                            <span>{roommate.sdt || '-'}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
+
+                        {detailTenant.anhGiayTo && detailTenant.anhGiayTo.length > 0 && (
+                            <div className="mt-5">
+                                <p className="mb-3 text-sm font-bold uppercase text-gray-400">Ảnh giấy tờ ({detailTenant.anhGiayTo.length})</p>
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                    {detailTenant.anhGiayTo.map((url, index) => (
+                                        <a
+                                            key={`${url}-${index}`}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                                        >
+                                            <img src={url} alt={`Ảnh giấy tờ ${index + 1}`} className="h-36 w-full object-cover transition-transform group-hover:scale-105" />
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {detailTenant.ghiChu && (
+                            <div className="mt-5 rounded-xl bg-gray-50 p-4">
+                                <p className="text-xs font-medium text-gray-400">Ghi chú</p>
+                                <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{detailTenant.ghiChu}</p>
+                            </div>
+                        )}
 
                         <div className="mt-6 flex gap-3 border-t border-gray-100 pt-4">
                             <button type="button" onClick={() => setDetailTenant(null)} className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Hủy</button>
@@ -563,12 +709,17 @@ const Tenant = () => {
                 </div>
             )}
 
-            {deletingTenant && (
+            {movingOutTenant && (
                 <ConfirmDialog
-                    title="Xác nhận xóa khách thuê"
-                    message={`Bạn có chắc chắn muốn xóa khách thuê ${deletingTenant.name}? Hành động này không thể hoàn tác.`}
-                    onCancel={() => setDeletingTenant(null)}
-                    onConfirm={confirmDelete}
+                    title="Xác nhận khách trả phòng"
+                    message={
+                        movingOutTenant.trangThai === 'DANG_THUE'
+                            ? `Khách thuê ${movingOutTenant.hoTen} đang thuê phòng. Hệ thống sẽ cập nhật trạng thái khách thuê thành "Đã chuyển đi", giải phóng phòng về trạng thái trống và hủy các hợp đồng còn hạn với lý do "Khách trả phòng trước hạn".`
+                            : `Khách thuê ${movingOutTenant.hoTen} sẽ được cập nhật trạng thái thành "Đã chuyển đi".`
+                    }
+                    confirmText="Xác nhận trả phòng"
+                    onCancel={() => setMovingOutTenant(null)}
+                    onConfirm={confirmMoveOut}
                 />
             )}
         </div>
