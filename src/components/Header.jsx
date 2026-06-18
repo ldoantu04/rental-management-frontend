@@ -1,55 +1,90 @@
-import React, { useContext, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import axios from 'axios'
 import { assets } from '../assets/assets'
 import { RentalContext } from '../context/RentalContext'
 
-const sampleNotifications = [
-    {
-        id: 1,
-        type: 'invoice',
-        title: 'Cảnh báo thanh toán hóa đơn',
-        description: 'Hóa đơn tháng 5 phòng 101 chưa được thanh toán — Hạn thanh toán còn 3 ngày.',
-        time: '2 giờ trước',
-        unread: true,
-        room: 'Phòng 101'
+const pageSize = 5
+
+const TYPE_MAP = {
+    HOA_DON: {
+        key: 'invoice',
+        label: 'Hóa Đơn',
+        icon: assets.icon_invoice,
+        tone: 'bg-orange-100'
     },
-    {
-        id: 2,
-        type: 'contract',
-        title: 'Hợp đồng sắp hết hạn',
-        description: 'Hợp đồng phòng 205 sắp hết hạn vào ngày 30/06/2026.',
-        time: '5 giờ trước',
-        unread: true,
-        room: 'Phòng 205'
+    HOP_DONG_HET_HAN: {
+        key: 'contract',
+        label: 'Hợp Đồng',
+        icon: assets.icon_contract,
+        tone: 'bg-blue-100'
     },
-    {
-        id: 3,
-        type: 'transaction',
-        title: 'Giao dịch thành công',
-        description: 'Giao dịch thanh toán thành công — Phòng 103, số tiền 2.500.000đ.',
-        time: 'Hôm qua, 14:30',
-        unread: false,
-        room: 'Phòng 103'
+    THANH_TOAN: {
+        key: 'transaction',
+        label: 'Giao Dịch',
+        icon: assets.icon_transaction,
+        tone: 'bg-green-100'
     },
-    {
-        id: 4,
-        type: 'system',
-        title: 'Thông báo từ hệ thống',
-        description: 'Hệ thống gửi email nhắc nợ định kỳ thành công.',
-        time: '23/05/2026',
-        unread: false,
-        room: 'System Auto'
+    HE_THONG: {
+        key: 'system',
+        label: 'Hệ Thống',
+        icon: assets.icon_email,
+        tone: 'bg-gray-100'
     }
-]
+}
+
+const formatRelativeTime = (value) => {
+    if (!value) return '-'
+    const date = new Date(value)
+    if (isNaN(date.getTime())) return '-'
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSec = Math.floor(diffMs / 1000)
+    if (diffSec < 60) return 'Vừa xong'
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `${diffMin} phút trước`
+    const diffHour = Math.floor(diffMin / 60)
+    if (diffHour < 24) return `${diffHour} giờ trước`
+    const diffDay = Math.floor(diffHour / 24)
+    if (diffDay === 1) return `Hôm qua, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+    if (diffDay < 7) return `${diffDay} ngày trước`
+    const dd = date.getDate().toString().padStart(2, '0')
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0')
+    const yyyy = date.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+}
+
+const extractRoom = (noiDung) => {
+    if (!noiDung) return null
+    const match = noiDung.match(/phòng\s+([^\s.,-]+)/i)
+    return match ? `Phòng ${match[1]}` : null
+}
+
+const mapNotification = (item) => {
+    const typeKey = item.loai || 'HE_THONG'
+    const config = TYPE_MAP[typeKey] || TYPE_MAP.HE_THONG
+    return {
+        id: item.id,
+        type: config.key,
+        typeKey,
+        title: item.tieuDe || 'Thông báo',
+        description: item.noiDung || '',
+        time: formatRelativeTime(item.ngayTao),
+        unread: !item.daDoc,
+        room: extractRoom(item.noiDung) || 'Hệ thống'
+    }
+}
 
 const Header = ({ title }) => {
 
-    const { user } = useContext(RentalContext)
+    const { backendUrl, token, user } = useContext(RentalContext)
     const [showNotifications, setShowNotifications] = useState(false)
-    const [notifications, setNotifications] = useState(sampleNotifications)
+    const [notifications, setNotifications] = useState([])
+    const [unreadCount, setUnreadCount] = useState(0)
     const [activeTab, setActiveTab] = useState('all')
     const [currentPage, setCurrentPage] = useState(1)
+    const [loading, setLoading] = useState(false)
+    const [marking, setMarking] = useState(false)
 
-const pageSize = 5
     const panelRef = useRef(null)
 
     const initials = user?.hoTen
@@ -61,34 +96,48 @@ const pageSize = 5
             .toUpperCase()
         : 'NA'
 
-    const unreadCount = notifications.filter((item) => item.unread).length
-
     const tabs = [
         { key: 'all', label: 'Tất cả' },
         { key: 'unread', label: `Chưa Đọc (${unreadCount})` },
         { key: 'invoice', label: 'Hóa Đơn' },
         { key: 'contract', label: 'Hợp Đồng' },
+        { key: 'transaction', label: 'Giao Dịch' },
         { key: 'system', label: 'Hệ Thống' }
     ]
 
-    const filteredNotifications =
-        activeTab === 'all'
-            ? notifications
-            : activeTab === 'unread'
-                ? notifications.filter(item => item.unread)
-                : notifications.filter(
-                    item => item.type === activeTab
-                )
+    const filteredNotifications = useMemo(() => {
+        if (activeTab === 'all') return notifications
+        if (activeTab === 'unread') return notifications.filter(item => item.unread)
+        return notifications.filter(item => item.type === activeTab)
+    }, [notifications, activeTab])
 
-    const totalPages = Math.ceil(
-        filteredNotifications.length / pageSize
+    const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / pageSize))
+
+    const paginatedNotifications = useMemo(
+        () => filteredNotifications.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+        [filteredNotifications, currentPage]
     )
 
-    const paginatedNotifications =
-        filteredNotifications.slice(
-            (currentPage - 1) * pageSize,
-            currentPage * pageSize
-        )
+    const fetchNotifications = useCallback(async () => {
+        if (!token) return
+        try {
+            setLoading(true)
+            const response = await axios.get(backendUrl + '/api/notifications', {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const list = (response.data || []).map(mapNotification)
+            setNotifications(list)
+            setUnreadCount(list.filter(item => item.unread).length)
+        } catch (error) {
+            console.log('Khong the tai thong bao:', error)
+        } finally {
+            setLoading(false)
+        }
+    }, [backendUrl, token])
+
+    useEffect(() => {
+        fetchNotifications()
+    }, [fetchNotifications])
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -102,33 +151,42 @@ const pageSize = 5
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [showNotifications])
 
-    const markAllAsRead = () => {
-        setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })))
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [activeTab])
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages)
+        }
+    }, [totalPages, currentPage])
+
+    const markAllAsRead = async () => {
+        if (!token || unreadCount === 0 || marking) return
+        try {
+            setMarking(true)
+            await axios.put(backendUrl + '/api/notifications/read-all', null, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })))
+            setUnreadCount(0)
+        } catch (error) {
+            console.log('Khong the danh dau tat ca da doc:', error)
+        } finally {
+            setMarking(false)
+        }
     }
 
-    const notificationTypes = {
-        invoice: {
-            label: 'Hóa Đơn',
-            icon: assets.icon_invoice,
-            tone: 'bg-orange-100'
-        },
-
-        contract: {
-            label: 'Hợp Đồng',
-            icon: assets.icon_contract,
-            tone: 'bg-blue-100'
-        },
-
-        transaction: {
-            label: 'Hệ Thống',
-            icon: assets.icon_transaction,
-            tone: 'bg-green-100'
-        },
-
-        system: {
-            label: 'Hệ Thống',
-            icon: assets.icon_email,
-            tone: 'bg-gray-100'
+    const openNotification = async (item) => {
+        if (!token || !item.unread) return
+        try {
+            await axios.put(backendUrl + `/api/notifications/${item.id}/read`, null, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setNotifications((prev) => prev.map((n) => n.id === item.id ? { ...n, unread: false } : n))
+            setUnreadCount((prev) => Math.max(0, prev - 1))
+        } catch (error) {
+            console.log('Khong the danh dau da doc:', error)
         }
     }
 
@@ -174,7 +232,8 @@ const pageSize = 5
                                 <button
                                     type='button'
                                     onClick={markAllAsRead}
-                                    className='text-sm font-medium text-[#80001C]'
+                                    disabled={unreadCount === 0 || marking}
+                                    className={`text-sm font-medium ${unreadCount === 0 || marking ? 'text-gray-300' : 'text-[#80001C]'}`}
                                 >
                                     ✓✓ Đánh dấu tất cả đã đọc
                                 </button>
@@ -182,7 +241,7 @@ const pageSize = 5
 
                             {/* Filter */}
 
-                            <div className='mt-5 flex gap-2 px-4'>
+                            <div className='mt-5 flex gap-2 px-4 overflow-x-auto'>
                                 {tabs.map(tab => (
                                     <button
                                         key={tab.key}
@@ -190,7 +249,7 @@ const pageSize = 5
                                             setActiveTab(tab.key)
                                             setCurrentPage(1)
                                         }}
-                                        className={`rounded-full px-5 py-2 text-sm transition
+                                        className={`whitespace-nowrap rounded-full px-5 py-2 text-sm transition
                                         ${
                                             activeTab === tab.key
                                                 ? 'bg-[#80001C] text-white'
@@ -206,15 +265,23 @@ const pageSize = 5
 
                             <div className='mt-5 flex-1 overflow-y-auto px-4'>
 
-                                {paginatedNotifications.map(item => {
+                                {loading ? (
+                                    <div className='py-10 text-center text-sm text-gray-400'>
+                                        Đang tải thông báo...
+                                    </div>
+                                ) : paginatedNotifications.length === 0 ? (
+                                    <div className='py-10 text-center text-sm text-gray-400'>
+                                        Không có thông báo nào
+                                    </div>
+                                ) : paginatedNotifications.map(item => {
 
-                                    const config =
-                                        notificationTypes[item.type]
+                                    const config = TYPE_MAP[item.typeKey] || TYPE_MAP.HE_THONG
 
                                     return (
                                         <div
                                             key={item.id}
-                                            className={`mb-3 rounded-2xl border p-4 transition-all
+                                            onClick={() => openNotification(item)}
+                                            className={`mb-3 cursor-pointer rounded-2xl border p-4 transition-all
                                             ${
                                                 item.unread
                                                     ? 'border-blue-100 bg-[#F7F9FC]'
@@ -269,51 +336,53 @@ const pageSize = 5
 
                             {/* Pagination */}
 
-                            <div className='flex items-center justify-center gap-2 border-t border-gray-100 p-5'>
+                            {filteredNotifications.length > 0 && (
+                                <div className='flex items-center justify-center gap-2 border-t border-gray-100 p-5'>
 
-                                <button
-                                    disabled={currentPage === 1}
-                                    onClick={() =>
-                                        setCurrentPage(prev => prev - 1)
-                                    }
-                                    className='flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200'
-                                >
-                                    ‹
-                                </button>
+                                    <button
+                                        disabled={currentPage === 1}
+                                        onClick={() =>
+                                            setCurrentPage(prev => prev - 1)
+                                        }
+                                        className='flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 disabled:opacity-40'
+                                    >
+                                        ‹
+                                    </button>
 
-                                {Array.from(
-                                    { length: totalPages },
-                                    (_, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() =>
-                                                setCurrentPage(index + 1)
-                                            }
-                                            className={`h-10 w-10 rounded-xl text-sm font-medium
-                                            ${
-                                                currentPage === index + 1
-                                                    ? 'bg-[#80001C] text-white'
-                                                    : ''
-                                            }`}
-                                        >
-                                            {index + 1}
-                                        </button>
-                                    )
-                                )}
+                                    {Array.from(
+                                        { length: totalPages },
+                                        (_, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() =>
+                                                    setCurrentPage(index + 1)
+                                                }
+                                                className={`h-10 w-10 rounded-xl text-sm font-medium
+                                                ${
+                                                    currentPage === index + 1
+                                                        ? 'bg-[#80001C] text-white'
+                                                        : ''
+                                                }`}
+                                            >
+                                                {index + 1}
+                                            </button>
+                                        )
+                                    )}
 
-                                <button
-                                    disabled={
-                                        currentPage === totalPages
-                                    }
-                                    onClick={() =>
-                                        setCurrentPage(prev => prev + 1)
-                                    }
-                                    className='flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200'
-                                >
-                                    ›
-                                </button>
+                                    <button
+                                        disabled={
+                                            currentPage === totalPages
+                                        }
+                                        onClick={() =>
+                                            setCurrentPage(prev => prev + 1)
+                                        }
+                                        className='flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 disabled:opacity-40'
+                                    >
+                                        ›
+                                    </button>
 
-                            </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
