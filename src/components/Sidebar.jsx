@@ -3,22 +3,34 @@ import { NavLink } from 'react-router-dom'
 import { assets } from '../assets/assets'
 import { RentalContext } from '../context/RentalContext'
 
+const ADMIN_QUAN_LY_MENU = [
+    { label: 'Tổng Quan', icon: assets.icon_overview, path: '/tong-quan' },
+    { label: 'Nhà Trọ', icon: assets.icon_motel, path: '/nha-tro' },
+    { label: 'Phòng Trọ', icon: assets.icon_room, path: '/phong-tro' },
+    { label: 'Khách Thuê', icon: assets.icon_tenant, path: '/khach-thue' },
+    { label: 'Hợp Đồng', icon: assets.icon_contract, path: '/hop-dong' },
+    { label: 'Hóa Đơn', icon: assets.icon_invoice, path: '/hoa-don' },
+    { label: 'Giao Dịch', icon: assets.icon_transaction, path: '/giao-dich' },
+    { label: 'Trợ Lý AI', icon: assets.icon_ai, path: '/tro-ly-ai' },
+    { label: 'Nhân Viên', icon: assets.icon_staff, path: '/nhan-vien' },
+    { label: 'Cài Đặt', icon: assets.icon_setting, path: '/cai-dat' }
+]
+
+const NHAN_VIEN_MENU = [
+    { label: 'Phòng Trọ', icon: assets.icon_room, path: '/phong-tro' },
+    { label: 'Khách Thuê', icon: assets.icon_tenant, path: '/khach-thue' },
+    { label: 'Hợp Đồng', icon: assets.icon_contract, path: '/hop-dong' },
+    { label: 'Hóa Đơn', icon: assets.icon_invoice, path: '/hoa-don' },
+    { label: 'Giao Dịch', icon: assets.icon_transaction, path: '/giao-dich' },
+    { label: 'Trợ Lý AI', icon: assets.icon_ai, path: '/tro-ly-ai' },
+]
+
 const Sidebar = () => {
 
-    const { user, showLogoutConfirm, setShowLogoutConfirm } = useContext(RentalContext)
+    const { user, setShowLogoutConfirm } = useContext(RentalContext)
 
-    const menuItems = [
-        { label: 'Tổng Quan', icon: assets.icon_overview, path: '/tong-quan' },
-        { label: 'Nhà Trọ', icon: assets.icon_motel, path: '/nha-tro' },
-        { label: 'Phòng Trọ', icon: assets.icon_room, path: '/phong-tro' },
-        { label: 'Khách Thuê', icon: assets.icon_tenant, path: '/khach-thue' },
-        { label: 'Hợp Đồng', icon: assets.icon_contract, path: '/hop-dong' },
-        { label: 'Hóa Đơn', icon: assets.icon_invoice, path: '/hoa-don' },
-        { label: 'Giao Dịch', icon: assets.icon_transaction, path: '/giao-dich' },
-        { label: 'Trợ Lý AI', icon: assets.icon_ai, path: '/tro-ly-ai' },
-        { label: 'Nhân Viên', icon: assets.icon_staff, path: '/nhan-vien' },
-        { label: 'Cài Đặt', icon: assets.icon_setting, path: '/cai-dat' }
-    ]
+    const role = user?.vaiTro
+    const menuItems = role === 'NHAN_VIEN' ? NHAN_VIEN_MENU : ADMIN_QUAN_LY_MENU
 
     return (
         <div className='fixed top-0 left-0 w-[220px] h-screen bg-white border-r border-gray-200 flex flex-col'>

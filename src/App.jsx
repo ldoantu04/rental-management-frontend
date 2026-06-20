@@ -23,8 +23,8 @@ const LogoutModal = () => {
   if (!showLogoutConfirm) return null
 
   return (
-    <div className='fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4'>
-      <div className='w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-xl'>
+    <div className='fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4' onClick={() => setShowLogoutConfirm(false)}>
+      <div className='w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-xl' onClick={(e) => e.stopPropagation()}>
         <div className='mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#FDF2F4]'>
           <img className='h-7 w-7' src={assets.icon_logout} alt='' />
         </div>
@@ -40,7 +40,7 @@ const LogoutModal = () => {
           </button>
           <button
             type='button'
-            onClick={logout}
+            onClick={() => { setShowLogoutConfirm(false); logout() }}
             className='rounded-xl bg-[#80001C] py-3 text-sm font-medium text-white hover:bg-[#6B0018]'
           >
             Đăng xuất

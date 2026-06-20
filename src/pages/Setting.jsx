@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
+import axios from 'axios'
 
 const tabs = [
     { key: 'payment', label: 'Thanh toán', icon: 'card' },
@@ -52,70 +53,12 @@ const invoiceRules = [
     }
 ]
 
-const emailTemplates = [
-    {
-        title: 'Nhắc nhở thanh toán',
-        tone: 'blue',
-        subject: 'Nhắc nhở: Hóa đơn tháng {month} sắp đến hạn',
-        content: `Kính gửi {tenant_name},
-
-Hóa đơn tháng {month} của bạn tại phòng {room}, {property} sẽ đến hạn thanh toán vào ngày {due_date}.
-
-Số tiền cần thanh toán: {amount} VNĐ
-
-Vui lòng thanh toán đúng hạn để tránh phát sinh phí trễ hạn.
-
-Trân trọng,
-Ban quản lý {property}`
-    },
-    {
-        title: 'Thông báo quá hạn',
-        tone: 'red',
-        subject: 'THÔNG BÁO: Hóa đơn tháng {month} đã quá hạn',
-        content: `Kính gửi {tenant_name},
-
-Hóa đơn tháng {month} tại phòng {room}, {property} đã quá hạn thanh toán {overdue_days} ngày.
-
-Số tiền còn nợ: {amount} VNĐ
-Phí phạt trễ hạn: {late_fee} VNĐ
-Tổng cần thanh toán: {total_amount} VNĐ
-
-Vui lòng liên hệ ban quản lý ngay để giải quyết.
-
-Trân trọng,
-Ban quản lý {property}`
-    },
-    {
-        title: 'Xác nhận thanh toán',
-        tone: 'green',
-        subject: 'Xác nhận: Đã nhận thanh toán hóa đơn tháng {month}',
-        content: `Kính gửi {tenant_name},
-
-Chúng tôi xác nhận đã nhận thanh toán hóa đơn tháng {month} cho phòng {room}, {property}.
-
-Số tiền đã thanh toán: {amount} VNĐ
-Phương thức: {payment_method}
-Ngày thanh toán: {payment_date}
-
-Cảm ơn bạn đã thanh toán đúng hạn!
-
-Trân trọng,
-Ban quản lý {property}`
-    },
-    {
-        title: 'Hết hạn hợp đồng',
-        tone: 'orange',
-        subject: 'Thông báo: Hợp đồng thuê phòng sắp hết hạn',
-        content: `Kính gửi {tenant_name},
-
-Hợp đồng thuê phòng {room} tại {property} của bạn sẽ hết hạn vào ngày {contract_end_date}.
-
-Nếu muốn gia hạn, vui lòng liên hệ ban quản lý trước ngày {renewal_deadline}.
-
-Trân trọng,
-Ban quản lý {property}`
-    }
-]
+const toneMap = {
+    'NHAC_THANH_TOAN': 'blue',
+    'QUA_HAN': 'red',
+    'XAC_NHAN_TT': 'green',
+    'HET_HAN_HD': 'orange'
+}
 
 const iconColor = {
     green: 'bg-green-100 text-green-600',
@@ -147,9 +90,10 @@ const Icon = ({ name, className = 'w-5 h-5' }) => {
     return <svg {...commonProps}>{paths[name]}</svg>
 }
 
-const Toggle = ({ enabled = true }) => (
+const Toggle = ({ enabled, onChange }) => (
     <button
         type="button"
+        onClick={onChange}
         className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors ${
             enabled ? 'bg-[#80001C] justify-end' : 'bg-gray-900 justify-start'
         }`}
@@ -165,9 +109,11 @@ const SettingIcon = ({ tone = 'maroon', icon = 'card' }) => (
     </div>
 )
 
-const StatusBadge = ({ children }) => (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-green-100 text-green-600 text-xs font-medium">
-        {children}
+const StatusBadge = ({ enabled }) => (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+        enabled ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'
+    }`}>
+        {enabled ? 'Đang bật' : 'Đang tắt'}
     </span>
 )
 
@@ -268,60 +214,197 @@ const InvoiceTab = () => (
     </>
 )
 
-const EmailTab = () => (
-    <>
-        <section className="mb-5">
-            <h2 className="text-xl font-bold text-gray-900">Mẫu email thông báo</h2>
-            <p className="text-sm text-gray-500 mt-2">Tùy chỉnh nội dung các email tự động gửi cho khách thuê.</p>
-        </section>
+const EmailTab = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL
+    const [templates, setTemplates] = useState([])
+    const [editingId, setEditingId] = useState(null)
+    const [editData, setEditData] = useState({})
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
-        <section className="space-y-5">
-            {emailTemplates.map((template) => (
-                <div key={template.title} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="p-5 border-b border-gray-100 flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                            <SettingIcon tone={template.tone} icon="mail" />
-                            <div>
-                                <h3 className="font-bold text-gray-900">{template.title}</h3>
-                                <div className="mt-1">
-                                    <StatusBadge>Đang bật</StatusBadge>
+    const fetchTemplates = useCallback(async () => {
+        try {
+            setLoading(true)
+            const res = await axios.get(`${backendUrl}/api/email-templates`)
+            setTemplates(res.data)
+            setError(null)
+        } catch (err) {
+            console.error('Lỗi khi tải mẫu email:', err)
+            setError('Không thể tải danh sách mẫu email')
+        } finally {
+            setLoading(false)
+        }
+    }, [backendUrl])
+
+    useEffect(() => {
+        fetchTemplates()
+    }, [fetchTemplates])
+
+    const handleEditClick = (template) => {
+        setEditingId(template.id)
+        setEditData({ tieuDe: template.tieuDe, noiDung: template.noiDung })
+    }
+
+    const handleSaveClick = async (id) => {
+        if (!editData.tieuDe || !editData.tieuDe.trim()) {
+            alert('Tiêu đề không được để trống')
+            return
+        }
+        if (!editData.noiDung || !editData.noiDung.trim()) {
+            alert('Nội dung không được để trống')
+            return
+        }
+        try {
+            const res = await axios.put(`${backendUrl}/api/email-templates/${id}`, {
+                tieuDe: editData.tieuDe.trim(),
+                noiDung: editData.noiDung.trim()
+            })
+            setTemplates(prev => prev.map(t => t.id === id ? res.data : t))
+            setEditingId(null)
+            setEditData({})
+        } catch (err) {
+            console.error('Lỗi khi lưu mẫu email:', err)
+            alert('Không thể lưu mẫu email. Vui lòng thử lại.')
+        }
+    }
+
+    const handleCancelClick = () => {
+        setEditingId(null)
+        setEditData({})
+    }
+
+    const handleToggle = async (template) => {
+        try {
+            const res = await axios.patch(
+                `${backendUrl}/api/email-templates/${template.id}/enabled`,
+                null,
+                { params: { enabled: !template.batBuoc } }
+            )
+            setTemplates(prev => prev.map(t => t.id === template.id ? res.data : t))
+        } catch (err) {
+            console.error('Lỗi khi cập nhật trạng thái:', err)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <span className="text-gray-500">Đang tải...</span>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <span className="text-red-500">{error}</span>
+            </div>
+        )
+    }
+
+    return (
+        <>
+            <section className="mb-5">
+                <h2 className="text-xl font-bold text-gray-900">Mẫu email thông báo</h2>
+                <p className="text-sm text-gray-500 mt-2">Tùy chỉnh nội dung các email tự động gửi cho khách thuê.</p>
+            </section>
+
+            <section className="space-y-5">
+                {templates.map((template) => {
+                    const isEditing = editingId === template.id
+                    const tone = toneMap[template.maMau] || 'blue'
+
+                    return (
+                        <div key={template.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+                            <div className="p-5 border-b border-gray-100 flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                    <SettingIcon tone={tone} icon="mail" />
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">{template.tenMau}</h3>
+                                        <div className="mt-1">
+                                            <StatusBadge enabled={template.batBuoc} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 text-[#80001C]">
+                                    <button
+                                        type="button"
+                                        onClick={() => isEditing ? handleSaveClick(template.id) : handleEditClick(template)}
+                                        aria-label={isEditing ? 'Lưu mẫu email' : 'Sửa mẫu email'}
+                                    >
+                                        <Icon name={isEditing ? 'save' : 'edit'} className="w-4 h-4" />
+                                    </button>
+                                    <Toggle
+                                        enabled={template.batBuoc}
+                                        onChange={() => handleToggle(template)}
+                                    />
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-4 text-[#80001C]">
-                            <button type="button" aria-label="Sửa mẫu email">
-                                <Icon name="edit" className="w-4 h-4" />
-                            </button>
-                            <Toggle enabled />
-                        </div>
-                    </div>
 
-                    <div className="p-5 space-y-4">
-                        <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Tiêu đề email</p>
-                            <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700">
-                                {template.subject}
+                            <div className="p-5 space-y-4">
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Tiêu đề email</p>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={editData.tieuDe}
+                                            onChange={e => setEditData(d => ({ ...d, tieuDe: e.target.value }))}
+                                            className="w-full h-11 rounded-xl bg-blue-50 px-4 text-sm text-gray-900 outline-none border border-blue-200"
+                                        />
+                                    ) : (
+                                        <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700">
+                                            {template.tieuDe}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Nội dung email</p>
+                                    {isEditing ? (
+                                        <textarea
+                                            value={editData.noiDung}
+                                            onChange={e => setEditData(d => ({ ...d, noiDung: e.target.value }))}
+                                            rows={10}
+                                            className="w-full rounded-xl bg-blue-50 px-4 py-3 text-sm text-gray-900 outline-none border border-blue-200 resize-y"
+                                        />
+                                    ) : (
+                                        <pre className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap font-sans leading-7">
+                                            {template.noiDung}
+                                        </pre>
+                                    )}
+                                </div>
+                                {isEditing && (
+                                    <div className="flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelClick}
+                                            className="h-9 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium mr-2 transition-colors"
+                                        >
+                                            Hủy
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSaveClick(template.id)}
+                                            className="h-9 px-5 rounded-xl bg-[#80001C] hover:bg-[#6B0018] text-white text-sm font-medium transition-colors"
+                                        >
+                                            Lưu
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Nội dung email</p>
-                            <pre className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap font-sans leading-7">
-                                {template.content}
-                            </pre>
-                        </div>
-                    </div>
-                </div>
-            ))}
+                    )
+                })}
 
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-                <p className="text-sm font-semibold text-red-600 mb-4">Biến có thể dùng:</p>
-                <p className="text-sm text-gray-600">
-                    {'{tenant_name}, {room}, {property}, {month}, {amount}, {due_date}, {overdue_days}, {late_fee}, {payment_method}, {payment_date}, {contract_end_date}'}
-                </p>
-            </div>
-        </section>
-    </>
-)
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+                    <p className="text-sm font-semibold text-red-600 mb-4">Biến có thể dùng:</p>
+                    <p className="text-sm text-gray-600">
+                        {'{tenant_name}, {room}, {property}, {month}, {amount}, {due_date}, {overdue_days}, {late_fee}, {payment_method}, {payment_date}, {contract_end_date}, {invoice_code}, {invoice_url}, {payment_url}'}
+                    </p>
+                </div>
+            </section>
+        </>
+    )
+}
 
 const Setting = () => {
     const [activeTab, setActiveTab] = useState('payment')
