@@ -117,7 +117,7 @@ const Chatbot = () => {
 
         const optimisticUserMsg = {
             id: 'temp-user-' + new Date().getTime(),
-            vaiTro: 'USER',
+            vaiTro: 'NGUOI_DUNG',
             noiDung: text,
             ngayTao: new Date().toISOString(),
             isOptimistic: true
@@ -364,7 +364,7 @@ const Chatbot = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {messages.map((msg) => {
-                                            const isUser = msg.vaiTro === 'USER'
+                                            const isUser = msg.vaiTro === 'NGUOI_DUNG'
                                             return (
                                                 <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                                                     <div className={`flex gap-2 max-w-[80%] ${isUser ? 'flex-row-reverse' : ''}`}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 import axios from 'axios'
+import { toast } from 'react-toastify'
 
 const tabs = [
     { key: 'payment', label: 'Thanh toán', icon: 'card' },
@@ -27,29 +28,6 @@ const paymentMethods = [
         description: 'Chưa kết nối',
         tone: 'red',
         enabled: false
-    }
-]
-
-const invoiceRules = [
-    {
-        title: 'Tự động tạo hóa đơn hàng tháng',
-        description: 'Hệ thống sẽ tự động tạo hóa đơn vào ngày 1 mỗi tháng',
-        enabled: true
-    },
-    {
-        title: 'Tự động gửi email thông báo quá hạn',
-        description: 'Gửi mỗi 5 ngày khi quá hạn, đến khi thanh toán xong',
-        enabled: true
-    },
-    {
-        title: 'Tự động gửi email xác nhận thanh toán',
-        description: 'Gửi ngay sau khi hệ thống ghi nhận thanh toán',
-        enabled: true
-    },
-    {
-        title: 'Tự động gửi email nhắc thanh toán',
-        description: 'Gửi 3 ngày trước hạn, lúc 8:00 sáng',
-        enabled: true
     }
 ]
 
@@ -164,55 +142,182 @@ const PaymentTab = () => (
     </>
 )
 
-const InvoiceTab = () => (
-    <>
-        <section className="flex items-center justify-between mb-6">
-            <div>
-                <h2 className="text-xl font-bold text-gray-900">Cấu hình hóa đơn</h2>
-                <p className="text-sm text-gray-500 mt-2">Tùy chỉnh nội dung các email tự động gửi cho khách thuê.</p>
-            </div>
-            <button type="button" className="h-10 px-5 rounded-xl bg-[#80001C] hover:bg-[#6B0018] text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                <Icon name="save" className="w-4 h-4" />
-                Lưu cấu hình
-            </button>
-        </section>
+const InvoiceTab = () => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL
 
-        <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-5">
-            <div className="flex items-center gap-3 mb-10">
-                <SettingIcon tone="maroon" icon="bell" />
-                <h3 className="text-lg font-bold text-gray-900">Quy tắc hóa đơn & thanh toán</h3>
-            </div>
+    const [defaultDueDay, setDefaultDueDay] = useState('')
+    const [latePenaltyPercent, setLatePenaltyPercent] = useState('')
+    const [autoGenerateInvoice, setAutoGenerateInvoice] = useState(false)
+    const [autoSendOverdueEmail, setAutoSendOverdueEmail] = useState(false)
+    const [autoSendPaymentConfirmationEmail, setAutoSendPaymentConfirmationEmail] = useState(false)
+    const [autoSendPaymentReminderEmail, setAutoSendPaymentReminderEmail] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <ReadonlyInput
-                    label="Hạn thanh toán mặc định (Ngày)"
-                    value="2"
-                    helper="Số ngày trong tháng làm hạn thanh toán"
-                />
-                <ReadonlyInput
-                    label="Phí phạt trễ hạn (%)"
-                    value="10"
-                    helper="Phần trăm phí phạt trên tổng hóa đơn"
-                />
-            </div>
-        </section>
+    const fetchSettings = useCallback(async () => {
+        try {
+            setLoading(true)
+            const res = await axios.get(`${backendUrl}/api/invoice-settings`)
+            const data = res.data
+            setDefaultDueDay(data.defaultDueDay != null ? String(data.defaultDueDay) : '')
+            setLatePenaltyPercent(data.latePenaltyPercent != null ? String(data.latePenaltyPercent) : '')
+            setAutoGenerateInvoice(data.autoGenerateInvoice || false)
+            setAutoSendOverdueEmail(data.autoSendOverdueEmail || false)
+            setAutoSendPaymentConfirmationEmail(data.autoSendPaymentConfirmationEmail || false)
+            setAutoSendPaymentReminderEmail(data.autoSendPaymentReminderEmail || false)
+        } catch (err) {
+            console.error('Lỗi khi tải cấu hình:', err)
+            toast.error('Không thể tải cấu hình hóa đơn')
+        } finally {
+            setLoading(false)
+        }
+    }, [backendUrl])
 
-        <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-10">Tự động gửi email thông báo</h3>
-            <div className="space-y-3">
-                {invoiceRules.map((rule) => (
-                    <div key={rule.title} className="bg-gray-50 rounded-xl px-4 py-4 flex items-center justify-between">
-                        <div>
-                            <p className="font-medium text-gray-900">{rule.title}</p>
-                            <p className="text-sm text-gray-500 mt-1">{rule.description}</p>
+    useEffect(() => {
+        fetchSettings()
+    }, [fetchSettings])
+
+    const saveSettings = async () => {
+        if (defaultDueDay && (isNaN(Number(defaultDueDay)) || Number(defaultDueDay) < 1 || Number(defaultDueDay) > 31)) {
+            toast.error('Hạn thanh toán phải từ 1 đến 31')
+            return
+        }
+        if (latePenaltyPercent && (isNaN(Number(latePenaltyPercent)) || Number(latePenaltyPercent) < 0 || Number(latePenaltyPercent) > 100)) {
+            toast.error('Phí phạt phải từ 0 đến 100')
+            return
+        }
+        try {
+            setSaving(true)
+            await axios.put(`${backendUrl}/api/invoice-settings`, {
+                defaultDueDay: defaultDueDay ? Number(defaultDueDay) : null,
+                latePenaltyPercent: latePenaltyPercent ? Number(latePenaltyPercent) : null,
+                autoGenerateInvoice,
+                autoSendOverdueEmail,
+                autoSendPaymentConfirmationEmail,
+                autoSendPaymentReminderEmail
+            })
+            toast.success('Lưu cấu hình thành công')
+        } catch (err) {
+            console.error('Lỗi khi lưu cấu hình:', err)
+            toast.error('Lưu cấu hình thất bại')
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <span className="text-gray-500">Đang tải...</span>
+            </div>
+        )
+    }
+
+    const invoiceRules = [
+        {
+            title: 'Tự động tạo hóa đơn hàng tháng',
+            description: 'Hệ thống sẽ tự động tạo hóa đơn vào ngày 1 mỗi tháng',
+            value: autoGenerateInvoice,
+            onChange: (val) => { setAutoGenerateInvoice(val); saveSettings(); }
+        },
+        {
+            title: 'Tự động gửi email thông báo quá hạn',
+            description: 'Gửi mỗi 5 ngày khi quá hạn, đến khi thanh toán xong',
+            value: autoSendOverdueEmail,
+            onChange: (val) => { setAutoSendOverdueEmail(val); saveSettings(); }
+        },
+        {
+            title: 'Tự động gửi email xác nhận thanh toán',
+            description: 'Gửi ngay sau khi hệ thống ghi nhận thanh toán',
+            value: autoSendPaymentConfirmationEmail,
+            onChange: (val) => { setAutoSendPaymentConfirmationEmail(val); saveSettings(); }
+        },
+        {
+            title: 'Tự động gửi email nhắc thanh toán',
+            description: 'Gửi 3 ngày trước hạn, lúc 8:00 sáng',
+            value: autoSendPaymentReminderEmail,
+            onChange: (val) => { setAutoSendPaymentReminderEmail(val); saveSettings(); }
+        }
+    ]
+
+    return (
+        <>
+            <section className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-900">Cấu hình hóa đơn</h2>
+                    <p className="text-sm text-gray-500 mt-2">Tùy chỉnh nội dung các email tự động gửi cho khách thuê.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={saveSettings}
+                    disabled={saving}
+                    className="h-10 px-5 rounded-xl bg-[#80001C] hover:bg-[#6B0018] text-white text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {saving ? (
+                        <span>Đang lưu...</span>
+                    ) : (
+                        <>
+                            <Icon name="save" className="w-4 h-4" />
+                            Lưu cấu hình
+                        </>
+                    )}
+                </button>
+            </section>
+
+            <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-5">
+                <div className="flex items-center gap-3 mb-10">
+                    <SettingIcon tone="maroon" icon="bell" />
+                    <h3 className="text-lg font-bold text-gray-900">Quy tắc hóa đơn & thanh toán</h3>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <label className="block">
+                        <span className="block text-sm font-medium text-gray-900 mb-1">Hạn thanh toán mặc định (Ngày)</span>
+                        <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={defaultDueDay}
+                            onChange={e => setDefaultDueDay(e.target.value)}
+                            className="w-full h-11 rounded-xl bg-blue-50 px-4 text-sm text-gray-900 outline-none border border-blue-200"
+                        />
+                        <span className="block text-xs text-gray-400 mt-1">Số ngày trong tháng làm hạn thanh toán</span>
+                    </label>
+                    <label className="block">
+                        <span className="block text-sm font-medium text-gray-900 mb-1">Phí phạt trễ hạn (%)</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={latePenaltyPercent}
+                            onChange={e => setLatePenaltyPercent(e.target.value)}
+                            className="w-full h-11 rounded-xl bg-blue-50 px-4 text-sm text-gray-900 outline-none border border-blue-200"
+                        />
+                        <span className="block text-xs text-gray-400 mt-1">Phần trăm phí phạt trên tổng hóa đơn</span>
+                    </label>
+                </div>
+            </section>
+
+            <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-900 mb-10">Tự động gửi email thông báo</h3>
+                <div className="space-y-3">
+                    {invoiceRules.map((rule) => (
+                        <div key={rule.title} className="bg-gray-50 rounded-xl px-4 py-4 flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-gray-900">{rule.title}</p>
+                                <p className="text-sm text-gray-500 mt-1">{rule.description}</p>
+                            </div>
+                            <Toggle
+                                enabled={rule.value}
+                                onChange={() => rule.onChange(!rule.value)}
+                            />
                         </div>
-                        <Toggle enabled={rule.enabled} />
-                    </div>
-                ))}
-            </div>
-        </section>
-    </>
-)
+                    ))}
+                </div>
+            </section>
+        </>
+    )
+}
 
 const EmailTab = () => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL
@@ -247,11 +352,11 @@ const EmailTab = () => {
 
     const handleSaveClick = async (id) => {
         if (!editData.tieuDe || !editData.tieuDe.trim()) {
-            alert('Tiêu đề không được để trống')
+            toast.error('Tiêu đề không được để trống')
             return
         }
         if (!editData.noiDung || !editData.noiDung.trim()) {
-            alert('Nội dung không được để trống')
+            toast.error('Nội dung không được để trống')
             return
         }
         try {
@@ -264,7 +369,7 @@ const EmailTab = () => {
             setEditData({})
         } catch (err) {
             console.error('Lỗi khi lưu mẫu email:', err)
-            alert('Không thể lưu mẫu email. Vui lòng thử lại.')
+            toast.error('Không thể lưu mẫu email. Vui lòng thử lại.')
         }
     }
 

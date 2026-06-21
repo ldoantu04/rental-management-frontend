@@ -6,6 +6,25 @@ import { toast } from 'react-toastify'
 import axios from 'axios'
 import { RentalContext } from '../context/RentalContext'
 
+// ============================================================
+// Validation helpers
+// ============================================================
+const isValidPhone = (v) => !v || /^0[0-9]{9,10}$/.test(v)
+const isValidCccd = (v) => !v || /^[0-9]{12}$/.test(v)
+const isValidEmail = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+const isValidName = (v) => !v || (v.trim().length >= 2 && /^[\p{L}\s]+$/u.test(v))
+
+const formatPhone = (v) => v ? v.replace(/[^\d]/g, '').slice(0, 11) : ''
+const formatCccd = (v) => v ? v.replace(/[^\d]/g, '').slice(0, 12) : ''
+const formatName = (v) => v ? v.replace(/[0-9]/g, '').slice(0, 100) : ''
+
+const VALIDATE = {
+  sdt:    { ok: isValidPhone,   msg: 'Số điện thoại phải là 10-11 chữ số, bắt đầu bằng số 0' },
+  cccd:   { ok: isValidCccd,    msg: 'Số CCCD phải là 12 chữ số' },
+  email:  { ok: isValidEmail,   msg: 'Email không hợp lệ' },
+  hoTen:  { ok: isValidName,    msg: 'Họ tên phải từ 2 ký tự, không chứa số' }
+}
+
 const statusConfig = {
     HOAT_DONG: {
         label: 'Đang làm việc',
@@ -20,7 +39,6 @@ const statusConfig = {
 }
 
 const roleMap = {
-    ADMIN: 'Quản trị',
     QUAN_LY: 'Quản trị',
     NHAN_VIEN: 'Nhân viên'
 }
@@ -69,6 +87,7 @@ const Staff = () => {
         assignedMotelIds: [],
         trangThai: 'HOAT_DONG'
     })
+    const [fieldErrors, setFieldErrors] = useState({})
 
     const fetchStaff = async () => {
         if (!token) return
@@ -118,6 +137,7 @@ const Staff = () => {
             hoTen: '', ngaySinh: '', sdt: '', email: '', cccd: '', diaChi: '',
             ngayVaoLam: '', vaiTro: 'NHAN_VIEN', assignedMotelIds: [], trangThai: 'HOAT_DONG'
         })
+        setFieldErrors({})
         setShowForm(true)
     }
 
@@ -135,12 +155,27 @@ const Staff = () => {
             assignedMotelIds: staff.assignedMotels ? staff.assignedMotels.map(m => m.id) : [],
             trangThai: staff.trangThai || 'HOAT_DONG'
         })
+        setFieldErrors({})
         setShowForm(true)
+    }
+
+    const validateFields = () => {
+        const errs = {}
+        if (formData.hoTen && !VALIDATE.hoTen.ok(formData.hoTen)) errs.hoTen = VALIDATE.hoTen.msg
+        if (formData.sdt && !VALIDATE.sdt.ok(formData.sdt)) errs.sdt = VALIDATE.sdt.msg
+        if (formData.cccd && !VALIDATE.cccd.ok(formData.cccd)) errs.cccd = VALIDATE.cccd.msg
+        if (formData.email && !VALIDATE.email.ok(formData.email)) errs.email = VALIDATE.email.msg
+        return errs
     }
 
     const handleSubmit = async (event) => {
         event.preventDefault()
         if (!token) return
+        const errs = validateFields()
+        if (Object.keys(errs).length > 0) {
+            setFieldErrors(errs)
+            return
+        }
         try {
             const payload = { ...formData }
             if (payload.vaiTro === 'QUAN_LY') {
@@ -342,27 +377,117 @@ const Staff = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4 p-6">
-                            {[
-                                ['Họ và tên *', 'hoTen', 'Nhập họ và tên', 'text', true],
-                                ['Ngày sinh', 'ngaySinh', '', 'date', false],
-                                ['Số điện thoại', 'sdt', 'Nhập số điện thoại', 'text', false],
-                                ['Email *', 'email', 'Nhập email', 'email', true],
-                                ['Số CCCD', 'cccd', 'Nhập số CCCD', 'text', false],
-                                ['Địa chỉ', 'diaChi', 'Nhập địa chỉ', 'text', false],
-                                ['Ngày vào làm', 'ngayVaoLam', '', 'date', false]
-                            ].map(([label, field, placeholder, type, required]) => (
-                                <label key={field} className="block">
-                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">{label}</span>
+                            {/* Ho va ten */}
+                            <label className="block">
+                                <span className="mb-1.5 block text-sm font-medium text-gray-700">Họ và tên *</span>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.hoTen}
+                                    onChange={e => {
+                                        const v = formatName(e.target.value)
+                                        setFormData(p => ({ ...p, hoTen: v }))
+                                        if (fieldErrors.hoTen) setFieldErrors(p => ({ ...p, hoTen: undefined }))
+                                    }}
+                                    placeholder="Nguyễn Văn A"
+                                    className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                        fieldErrors.hoTen ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                    }`}
+                                />
+                                {fieldErrors.hoTen && <p className="mt-1 text-xs text-red-500">{fieldErrors.hoTen}</p>}
+                            </label>
+
+                            {/* Ngay sinh + So dien thoai */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Ngày sinh</span>
                                     <input
-                                        type={type}
-                                        required={required}
-                                        value={formData[field] || ''}
-                                        onChange={e => setFormData({ ...formData, [field]: e.target.value })}
-                                        placeholder={placeholder}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                        type="date"
+                                        value={formData.ngaySinh}
+                                        onChange={e => setFormData(p => ({ ...p, ngaySinh: e.target.value }))}
+                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
                                     />
                                 </label>
-                            ))}
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Số điện thoại</span>
+                                    <input
+                                        type="tel"
+                                        value={formData.sdt}
+                                        onChange={e => {
+                                            const v = formatPhone(e.target.value)
+                                            setFormData(p => ({ ...p, sdt: v }))
+                                            if (fieldErrors.sdt) setFieldErrors(p => ({ ...p, sdt: undefined }))
+                                        }}
+                                        placeholder="0901234567"
+                                        className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                            fieldErrors.sdt ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                        }`}
+                                    />
+                                    {fieldErrors.sdt && <p className="mt-1 text-xs text-red-500">{fieldErrors.sdt}</p>}
+                                </label>
+                            </div>
+
+                            {/* Email + CCCD */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Email *</span>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={formData.email}
+                                        onChange={e => {
+                                            setFormData(p => ({ ...p, email: e.target.value }))
+                                            if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: undefined }))
+                                        }}
+                                        placeholder="email@domain.com"
+                                        className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                            fieldErrors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                        }`}
+                                    />
+                                    {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
+                                </label>
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Số CCCD</span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={formData.cccd}
+                                        onChange={e => {
+                                            const v = formatCccd(e.target.value)
+                                            setFormData(p => ({ ...p, cccd: v }))
+                                            if (fieldErrors.cccd) setFieldErrors(p => ({ ...p, cccd: undefined }))
+                                        }}
+                                        placeholder="033333333333"
+                                        className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                            fieldErrors.cccd ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                        }`}
+                                    />
+                                    {fieldErrors.cccd && <p className="mt-1 text-xs text-red-500">{fieldErrors.cccd}</p>}
+                                </label>
+                            </div>
+
+                            {/* Dia chi + Ngay vao lam */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Địa chỉ</span>
+                                    <input
+                                        type="text"
+                                        value={formData.diaChi}
+                                        onChange={e => setFormData(p => ({ ...p, diaChi: e.target.value }))}
+                                        placeholder="Địa chỉ thường trú"
+                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                    />
+                                </label>
+                                <label className="block">
+                                    <span className="mb-1.5 block text-sm font-medium text-gray-700">Ngày vào làm</span>
+                                    <input
+                                        type="date"
+                                        value={formData.ngayVaoLam}
+                                        onChange={e => setFormData(p => ({ ...p, ngayVaoLam: e.target.value }))}
+                                        className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                    />
+                                </label>
+                            </div>
 
                             <label className="block">
                                 <span className="mb-1.5 block text-sm font-medium text-gray-700">Vai trò *</span>

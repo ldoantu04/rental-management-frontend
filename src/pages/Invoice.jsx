@@ -50,87 +50,26 @@ const formatNumber = (value) => new Intl.NumberFormat('vi-VN').format(Number(val
 const formatMoney = (value) => `${formatNumber(value)} VNĐ`
 
 const buildItemsFromInvoice = (invoice) => {
-    const rent = Number(invoice.rent || 0)
-    const elecStart = Number(invoice.electricStart || 0)
-    const elecEnd = Number(invoice.electricEnd || 0)
-    const elecPrice = Number(invoice.electricPrice || 0)
-    const waterStart = Number(invoice.waterStart || 0)
-    const waterEnd = Number(invoice.waterEnd || 0)
-    const waterPrice = Number(invoice.waterPrice || 0)
-    const waterMode = invoice.waterMode || 'CHI_SO'
-
-    const elecQty = Math.max(elecEnd - elecStart, 0)
-
-    const items = [
-        { name: 'Tiền phòng', unit: 'Phòng', start: '', end: '', soLuong: 1, donGia: rent, amount: rent },
-        {
-            name: 'Tiền điện', unit: 'Số', start: elecStart, end: elecEnd,
-            soLuong: elecQty, donGia: elecPrice,
-            amount: elecQty * elecPrice
-        }
-    ]
-
-    if (waterMode === 'CHI_SO') {
-        const waterQty = Math.max(waterEnd - waterStart, 0)
-        items.push({
-            name: 'Tiền nước', unit: 'm³', start: waterStart, end: waterEnd,
-            soLuong: waterQty, donGia: waterPrice,
-            amount: waterQty * waterPrice
-        })
-    } else     if (waterMode === 'THEO_NGUOI') {
-        const stored = Number(invoice.waterPeople)
-        const people = Number.isFinite(stored) && stored > 0 ? stored : 1
-        items.push({
-            name: 'Tiền nước', unit: 'người', start: '', end: '',
-            soLuong: people, donGia: waterPrice,
-            amount: people * waterPrice
-        })
-    } else {
-        items.push({
-            name: 'Tiền nước', unit: 'phòng', start: '', end: '',
-            soLuong: 1, donGia: waterPrice,
-            amount: waterPrice
-        })
-    }
-
+    // Use stored danhSachDichVu from backend as single source of truth.
+    // Backend always returns populated danhSachDichVu after create/update.
     const services = Array.isArray(invoice.services) ? invoice.services : []
-    services.forEach((service) => {
-        const donGia = Number(service.amount || 0)
-        const kieuTinh = (service.kieuTinh || 'Theo phong').toLowerCase()
-        const tenDichVu = (service.name || '').toLowerCase()
-        const isChiSo = kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')
-        const isElectricOrWaterByMeter = isChiSo && (
-            tenDichVu.includes('điện') || tenDichVu.includes('dien') ||
-            tenDichVu.includes('nước') || tenDichVu.includes('nuoc')
-        )
-        if (isElectricOrWaterByMeter) return
-
-        let soLuong, unit
-        if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
-            unit = 'người'
-        } else if (isChiSo) {
-            unit = 'Số'
-        } else {
-            unit = 'Phòng'
+    return services.map((s) => {
+        const name = s.name || s.tenDichVu || '-'
+        const loai = s.loaiDichVu || 'DICH_VU'
+        const chiSoDau = s.chiSoDau != null ? String(s.chiSoDau) : ''
+        const chiSoMoi = s.chiSoCuoi != null ? String(s.chiSoCuoi) : ''
+        return {
+            name,
+            unit: s.kieuTinh || 'Phòng',
+            chiSoDau,
+            chiSoMoi,
+            soLuong: Number(s.soLuong || 1),
+            donGia: Number(s.donGia || 0),
+            amount: Number(s.thanhTien || 0),
+            loaiDichVu: loai
         }
-        const stored = Number(service.soLuong)
-        soLuong = Number.isFinite(stored) && stored > 0 ? stored : 1
-
-        items.push({
-            name: service.name,
-            unit,
-            start: '',
-            end: '',
-            soLuong,
-            donGia,
-            amount: soLuong * donGia
-        })
     })
-
-    return items
 }
-
-const computeInvoiceTotal = (invoice) => buildItemsFromInvoice(invoice).reduce((sum, item) => sum + item.amount, 0)
 
 const roomDisplay = (contract) => {
     if (!contract || !contract.phongTro) return '-'
@@ -154,7 +93,9 @@ const ConfirmDialog = ({ title, message, onCancel, onConfirm }) => (
 
 const InvoicePreview = ({ invoice, onClose, onMarkPaid, onDownload }) => {
     const items = buildItemsFromInvoice(invoice)
-    const total = computeInvoiceTotal(invoice)
+    const tongTien = Number(invoice.tongTien || 0)
+    const phiPhat = Number(invoice.phiPhat || 0)
+    const subtotal = items.reduce((sum, item) => sum + item.amount, 0)
 
     return (
         <div className="fixed inset-0 z-[60] bg-gray-200">
@@ -220,7 +161,9 @@ const InvoicePreview = ({ invoice, onClose, onMarkPaid, onDownload }) => {
                                 <th className="px-3 py-4 text-left text-sm">STT</th>
                                 <th className="px-3 py-4 text-left text-sm">Danh mục</th>
                                 <th className="px-3 py-4 text-center text-sm">Đơn vị</th>
-                                <th className="px-3 py-4 text-center text-sm">SL</th>
+                                <th className="px-3 py-4 text-center text-sm">Chỉ số đầu</th>
+                                <th className="px-3 py-4 text-center text-sm">Chỉ số cuối</th>
+                                <th className="px-3 py-4 text-center text-sm">Số lượng</th>
                                 <th className="px-3 py-4 text-right text-sm">Đơn giá</th>
                                 <th className="px-3 py-4 text-right text-sm">Thành tiền</th>
                             </tr>
@@ -231,7 +174,9 @@ const InvoicePreview = ({ invoice, onClose, onMarkPaid, onDownload }) => {
                                     <td className="px-3 py-4 text-sm">{index + 1}</td>
                                     <td className="px-3 py-4 text-sm text-gray-500">{item.name}</td>
                                     <td className="px-3 py-4 text-center text-sm text-gray-500">{item.unit}</td>
-                                    <td className="px-3 py-4 text-center text-sm text-gray-500">{item.soLuong}</td>
+                                    <td className="px-3 py-4 text-center text-sm text-gray-500">{(item.loaiDichVu === 'DIEN' || item.loaiDichVu === 'NUOC') ? item.chiSoDau : ''}</td>
+                                    <td className="px-3 py-4 text-center text-sm text-gray-500">{(item.loaiDichVu === 'DIEN' || item.loaiDichVu === 'NUOC') ? item.chiSoMoi : ''}</td>
+                                    <td className="px-3 py-4 text-center text-sm text-gray-500">{formatNumber(item.soLuong)}</td>
                                     <td className="px-3 py-4 text-right text-sm text-gray-500">{formatNumber(item.donGia)}</td>
                                     <td className="px-3 py-4 text-right text-sm font-semibold text-gray-900">{formatMoney(item.amount)}</td>
                                 </tr>
@@ -239,9 +184,16 @@ const InvoicePreview = ({ invoice, onClose, onMarkPaid, onDownload }) => {
                         </tbody>
                     </table>
 
-                    <div className="mt-4 grid grid-cols-[1fr_240px] bg-red-50 px-8 py-6">
+                    {phiPhat > 0 && (
+                        <div className="mt-2 grid grid-cols-[1fr_240px] border border-red-100 bg-red-50/50 px-8 py-3 text-sm">
+                            <p className="font-medium text-red-600">Phí phạt quá hạn</p>
+                            <p className="text-right font-semibold text-red-600">{formatMoney(phiPhat)}</p>
+                        </div>
+                    )}
+
+                    <div className="mt-2 grid grid-cols-[1fr_240px] bg-red-50 px-8 py-6">
                         <p className="text-lg font-bold text-gray-900">TỔNG CỘNG</p>
-                        <p className="text-right text-lg font-bold text-[#80001C]">{formatMoney(total)}</p>
+                        <p className="text-right text-lg font-bold text-[#80001C]">{formatMoney(subtotal + phiPhat)}</p>
                     </div>
 
                     <div className="mt-20 grid grid-cols-2 gap-20 text-center text-sm text-gray-400">
@@ -294,8 +246,12 @@ const Invoice = () => {
             name: s.tenDichVu,
             kieuTinh: s.kieuTinh || 'Theo phong',
             soLuong: Number(s.soLuong || 1),
-            amount: Number(s.donGia || 0),
-            laTuHopDong: s.laTuHopDong !== false
+            donGia: Number(s.donGia || 0),
+            thanhTien: Number(s.thanhTien || 0),
+            laTuHopDong: s.laTuHopDong !== false,
+            loaiDichVu: s.loaiDichVu || 'DICH_VU',
+            chiSoDau: s.chiSoDau != null ? Number(s.chiSoDau) : null,
+            chiSoCuoi: s.chiSoCuoi != null ? Number(s.chiSoCuoi) : null
         }))
         const roommateCount = (i.hopDong?.khachThue?.danhSachNguoiOCung || []).length
         const roomPeople = Number(i.hopDong?.phongTro?.soNguoi || 0)
@@ -308,18 +264,19 @@ const Invoice = () => {
             maHopDong: i.hopDong?.id || null,
             month: toMonthInput(i.kyHoaDon),
             rent: Number(i.tienPhong || 0),
-            electricStart: i.chiSoDienCu == null ? 0 : i.chiSoDienCu,
-            electricEnd: i.chiSoDienMoi == null ? '' : i.chiSoDienMoi,
+            electricStart: i.chiSoDienCu,
+            electricEnd: i.chiSoDienMoi,
             electricPrice: Number(i.giaDien || 0),
             waterMode: i.kieuTinhNuoc || 'CHI_SO',
-            waterStart: i.chiSoNuocCu == null ? 0 : i.chiSoNuocCu,
-            waterEnd: i.chiSoNuocMoi == null ? '' : i.chiSoNuocMoi,
+            waterStart: i.chiSoNuocCu,
+            waterEnd: i.chiSoNuocMoi,
             waterPrice: Number(i.giaNuoc || 0),
             waterPeople: people,
             services,
             dueDate: i.hanThanhToan || '',
             status: i.trangThai || 'CHUA_THANH_TOAN',
             tongTien: Number(i.tongTien || 0),
+            phiPhat: Number(i.phiPhat || 0),
             ghiChu: i.ghiChu || ''
         }
     }
@@ -373,7 +330,7 @@ const Invoice = () => {
     }, [keyword, status, invoices])
 
     const countByStatus = (value) => invoices.filter((invoice) => invoice.status === value).length
-    const revenue = invoices.filter((invoice) => invoice.status === 'DA_THANH_TOAN').reduce((total, invoice) => total + Number(invoice.tongTien || computeInvoiceTotal(invoice)), 0)
+    const revenue = invoices.filter((invoice) => invoice.status === 'DA_THANH_TOAN').reduce((total, invoice) => total + Number(invoice.tongTien || 0), 0)
 
     const findContractByRoomString = (roomStr) => {
         if (!roomStr) return null
@@ -386,33 +343,18 @@ const Invoice = () => {
         setShowForm(true)
     }
 
-    const openEditModal = async (invoice) => {
+    const openEditModal = (invoice) => {
         setEditingInvoice(invoice)
-        let people = 1
-        if (invoice.maHopDong) {
-            try {
-                const matchedContract = activeContracts.find((c) => c.id === invoice.maHopDong)
-                if (matchedContract?.phongTro?.id) {
-                    const res = await axios.get(backendUrl + `/api/rooms/${matchedContract.phongTro.id}/people`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
-                    if (res.data && Number(res.data.soNguoi) > 0) {
-                        people = Number(res.data.soNguoi)
-                    } else if (matchedContract.khachThue?.danhSachNguoiOCung) {
-                        people = 1 + (matchedContract.khachThue.danhSachNguoiOCung.length || 0)
-                    } else if (matchedContract.phongTro?.soNguoi) {
-                        people = Number(matchedContract.phongTro.soNguoi)
-                    }
-                }
-            } catch {
-                const matchedContract = activeContracts.find((c) => c.id === invoice.maHopDong)
-                if (matchedContract?.khachThue?.danhSachNguoiOCung) {
-                    people = 1 + (matchedContract.khachThue.danhSachNguoiOCung.length || 0)
-                } else if (matchedContract?.phongTro?.soNguoi) {
-                    people = Number(matchedContract.phongTro.soNguoi)
-                }
-            }
-        }
+
+        // Extract waterPeople from stored invoice service items (the NUOC line item's soLuong)
+        const nuocItem = (invoice.services || []).find((s) => s.loaiDichVu === 'NUOC')
+        const storedWaterPeople = nuocItem ? Math.round(Number(nuocItem.soLuong || 1)) : 1
+
+        // formData.services = only DICH_VU items (electric/water handled by dedicated sections)
+        let services = (invoice.services || [])
+            .filter((s) => s.loaiDichVu === 'DICH_VU')
+            .map((s) => ({ ...s, amount: String(s.amount) }))
+
         setFormData({
             maHopDong: invoice.maHopDong || '',
             room: invoice.room,
@@ -426,43 +368,69 @@ const Invoice = () => {
             waterStart: invoice.waterStart === '' || invoice.waterStart == null ? 0 : invoice.waterStart,
             waterEnd: invoice.waterEnd === '' || invoice.waterEnd == null ? '' : invoice.waterEnd,
             waterPrice: String(invoice.waterPrice ?? ''),
-            waterPeople: people,
-            services: (invoice.services || []).map((s) => ({ ...s, amount: String(s.amount) })),
+            waterPeople: invoice.waterMode === 'THEO_NGUOI' ? storedWaterPeople : (invoice.waterPeople || 1),
+            services,
             dueDate: invoice.dueDate || '',
             status: invoice.status || 'CHUA_THANH_TOAN'
         })
+
+        // Async: fetch contract to get default prices + people count for THEO_NGUOI recalculation
+        if (invoice.maHopDong) {
+            axios.get(backendUrl + `/api/contracts/${invoice.maHopDong}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then((res) => {
+                const contract = res.data
+                const contractServices = contract.danhSachDichVu || []
+
+                // Default prices from contract service items (giaDien/giaNuoc are NOT on Contract root)
+                const hasElecPrice = Number(invoice.electricPrice ?? 0) > 0
+                const hasWaterPrice = Number(invoice.waterPrice ?? 0) > 0
+                const toUtilityPrice = (svcList, keywords) => {
+                    const found = svcList.find((s) => {
+                        if (!s?.tenDichVu) return false
+                        const n = s.tenDichVu.toLowerCase()
+                        return keywords.some((kw) => n.includes(kw))
+                    })
+                    return found?.donGia != null ? String(found.donGia) : ''
+                }
+                const contractElecPrice = toUtilityPrice(contractServices, ['điện', 'dien', 'electric'])
+                const contractWaterPrice = toUtilityPrice(contractServices, ['nước', 'nuoc', 'water'])
+                const contractWaterMode = contract.kieuTinhNuoc || 'CHI_SO'
+
+                // Resolve people count for THEO_NGUOI recalculation
+                let people = 1
+                if (contract.phongTro?.soNguoi) {
+                    people = Number(contract.phongTro.soNguoi)
+                } else if (contract.khachThue?.danhSachNguoiOCung) {
+                    people = 1 + (contract.khachThue.danhSachNguoiOCung.length || 0)
+                }
+
+                // Recalculate soLuong for THEO_NGUOI services
+                const updatedServices = services.map((s) => {
+                    const kt = ((s.kieuTinh || '') + '').toLowerCase()
+                    if (kt.includes('nguoi') || kt.includes('người')) {
+                        return { ...s, soLuong: people }
+                    }
+                    return s
+                })
+
+                setFormData((prev) => ({
+                    ...prev,
+                    electricPrice: hasElecPrice ? prev.electricPrice : (contractElecPrice || prev.electricPrice),
+                    waterMode: prev.waterMode === 'CHI_SO' && contractWaterMode !== 'CHI_SO' ? contractWaterMode : prev.waterMode,
+                    waterPrice: hasWaterPrice ? prev.waterPrice : (contractWaterPrice || prev.waterPrice),
+                    services: updatedServices
+                }))
+            }).catch(() => { /* contract not found, keep form as-is */ })
+        }
+
         setShowForm(true)
     }
 
     const applyContractToForm = async (contract) => {
         if (!contract) return
-        let electricPrice = 0
-        let waterMode = 'CHI_SO'
-        let waterPrice = 0
-        const services = []
-        for (const s of (contract.danhSachDichVu || [])) {
-            const kieuTinh = (s.kieuTinh || '').toLowerCase()
-            const tenDichVu = (s.tenDichVu || '').toLowerCase()
-            if (kieuTinh.includes('chi so') || tenDichVu.includes('điện') || tenDichVu.includes('dien')) {
-                if (electricPrice === 0) electricPrice = Number(s.donGia || 0)
-                continue
-            }
-            if (kieuTinh.includes('m3') || tenDichVu.includes('nước') || tenDichVu.includes('nuoc')) {
-                if (waterPrice === 0) waterPrice = Number(s.donGia || 0)
-                if (kieuTinh.includes('m3')) waterMode = 'CHI_SO'
-                else if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) waterMode = 'THEO_NGUOI'
-                else if (kieuTinh.includes('phong') || kieuTinh.includes('phòng')) waterMode = 'THEO_PHONG'
-                continue
-            }
-            services.push({
-                name: s.tenDichVu,
-                kieuTinh: s.kieuTinh || 'Theo phong',
-                soLuong: 1,
-                amount: String(Number(s.donGia || 0)),
-                laTuHopDong: true
-            })
-        }
 
+        // Resolve people count first (needed for both form fields and service quantities)
         let people = 1
         try {
             const res = await axios.get(backendUrl + `/api/rooms/${contract.phongTro?.id}/people`, {
@@ -473,16 +441,31 @@ const Invoice = () => {
             }
         } catch {
             try {
-                const room = contract.phongTro
-                if (room?.soNguoi) people = Number(room.soNguoi)
-                else if (contract.khachThue?.danhSachNguoiOCung) {
+                if (contract.phongTro?.soNguoi) {
+                    people = Number(contract.phongTro.soNguoi)
+                } else if (contract.khachThue?.danhSachNguoiOCung) {
                     people = 1 + (contract.khachThue.danhSachNguoiOCung.length || 0)
                 }
-            } catch {
-                /* fallback da bi bo qua */
-            }
+            } catch { /* ignore */ }
         }
 
+        // Extract utility prices from contract service items (giaDien/giaNuoc are NOT on Contract root)
+        const contractServices = contract.danhSachDichVu || []
+        const toUtilityPrice = (svcList, keywords) => {
+            const found = svcList.find((s) => {
+                if (!s?.tenDichVu) return false
+                const n = s.tenDichVu.toLowerCase()
+                return keywords.some((kw) => n.includes(kw))
+            })
+            return found?.donGia != null ? String(found.donGia) : ''
+        }
+        const electricPrice = toUtilityPrice(contractServices, ['điện', 'dien', 'electric'])
+        const waterPrice = toUtilityPrice(contractServices, ['nước', 'nuoc', 'water'])
+
+        // Water mode from contract root (gia tien nuoc theo chu ky / theo nguoi / theo phong)
+        const waterMode = contract.kieuTinhNuoc || 'CHI_SO'
+
+        // Resolve previous meter readings
         let previousMeters = { electricStart: '', waterStart: '' }
         try {
             const latestRes = await axios.get(backendUrl + `/api/invoices/contract/${contract.id}/latest`, {
@@ -498,6 +481,47 @@ const Invoice = () => {
             }
         }
 
+        // Default due date from contract.ngayThanhToan (day of month)
+        const ngayThanhToan = contract.ngayThanhToan
+        const defaultDueDate = ngayThanhToan ? (() => {
+            const now = new Date()
+            const year = now.getFullYear()
+            const month = now.getMonth()
+            const thisMonth = new Date(year, month, ngayThanhToan)
+            if (thisMonth >= now) {
+                return `${thisMonth.getFullYear()}-${String(thisMonth.getMonth() + 1).padStart(2, '0')}-${String(thisMonth.getDate()).padStart(2, '0')}`
+            }
+            const nextMonth = new Date(year, month + 1, ngayThanhToan)
+            return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(nextMonth.getDate()).padStart(2, '0')}`
+        })() : ''
+
+        // Map contract services, computing quantity for THEO_NGUOI.
+        // SKIP utility services: those with kieuTinh = "Theo chỉ số" OR with names
+        // containing dien/điện/nuoc/nước/water/electric. These are handled by the
+        // dedicated Tiền điện / Tiền nước form sections.
+        const services = contractServices
+            .filter((s) => s && s.tenDichVu && s.tenDichVu.trim())
+            .filter((s) => {
+                const kt = ((s.kieuTinh || '') + '').toLowerCase()
+                if (kt.includes('chỉ số') || kt.includes('chi so')) return false
+                const n = (s.tenDichVu || '').toLowerCase()
+                if (n.includes('điện') || n.includes('dien') || n.includes('nước') || n.includes('nuoc') || n.includes('water') || n.includes('electric')) return false
+                return true
+            })
+            .map((s) => {
+                const kt = ((s.kieuTinh || '') + '').toLowerCase()
+                const soLuong = (kt.includes('nguoi') || kt.includes('người')) ? people : 1
+                return {
+                    name: s.tenDichVu,
+                    kieuTinh: s.kieuTinh || 'Theo phòng',
+                    soLuong,
+                    amount: String(Number(s.donGia || 0)),
+                    donGia: Number(s.donGia || 0),
+                    laTuHopDong: true,
+                    loaiDichVu: 'DICH_VU'
+                }
+            })
+
         setFormData((prev) => ({
             ...prev,
             maHopDong: contract.id,
@@ -506,13 +530,14 @@ const Invoice = () => {
             rent: contract.giaThue != null ? String(contract.giaThue) : prev.rent,
             electricStart: previousMeters.electricStart === '' || previousMeters.electricStart == null ? 0 : previousMeters.electricStart,
             electricEnd: '',
-            electricPrice: String(electricPrice || prev.electricPrice || ''),
+            electricPrice: electricPrice || prev.electricPrice || '',
             waterMode,
             waterStart: previousMeters.waterStart === '' || previousMeters.waterStart == null ? 0 : previousMeters.waterStart,
             waterEnd: '',
-            waterPrice: String(waterPrice || prev.waterPrice || ''),
+            waterPrice: waterPrice || prev.waterPrice || '',
             waterPeople: people,
-            services
+            services,
+            dueDate: defaultDueDate || prev.dueDate
         }))
     }
 
@@ -533,33 +558,32 @@ const Invoice = () => {
         return val
     }
 
+    // Preview total for form display only. Backend computes the authoritative total.
+    // This uses the same formula as buildPayload for the top-level items.
     const calcFormTotal = (data) => {
         const rent = Number(data.rent || 0)
-        const electricAmount = calcElectricAmount(data)
-        const waterAmount = calcWaterAmount(data)
-        const servicesTotal = (data.services || []).reduce((sum, s) => {
-            const kieuTinh = (s.kieuTinh || 'Theo phong').toLowerCase()
-            const donGia = Number(s.amount || 0)
-            let soLuong = 1
-            if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
-                soLuong = Number(data.waterPeople || 1)
-            } else if (kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')) {
-                soLuong = Number(s.soLuong || 1)
-            }
-            return sum + soLuong * donGia
-        }, 0)
+        const electricQty = Math.max(Number(data.electricEnd || 0) - Number(data.electricStart || 0), 0)
+        const electricAmount = electricQty * Number(data.electricPrice || 0)
+        let waterAmount = 0
+        if (data.waterMode === 'CHI_SO') {
+            waterAmount = Math.max(Number(data.waterEnd || 0) - Number(data.waterStart || 0), 0) * Number(data.waterPrice || 0)
+        } else if (data.waterMode === 'THEO_NGUOI') {
+            waterAmount = Number(data.waterPeople || 1) * Number(data.waterPrice || 0)
+        } else {
+            waterAmount = Number(data.waterPrice || 0)
+        }
+        const servicesTotal = (data.services || []).reduce((sum, s) => sum + Number(s.amount || 0), 0)
         return rent + electricAmount + waterAmount + servicesTotal
     }
 
     const calcElectricAmount = (data) => {
-        const elecQty = Math.max(Number(data.electricEnd || 0) - Number(data.electricStart || 0), 0)
-        return elecQty * Number(data.electricPrice || 0)
+        const qty = Math.max(Number(data.electricEnd || 0) - Number(data.electricStart || 0), 0)
+        return qty * Number(data.electricPrice || 0)
     }
 
     const calcWaterAmount = (data) => {
         if (data.waterMode === 'CHI_SO') {
-            const waterQty = Math.max(Number(data.waterEnd || 0) - Number(data.waterStart || 0), 0)
-            return waterQty * Number(data.waterPrice || 0)
+            return Math.max(Number(data.waterEnd || 0) - Number(data.waterStart || 0), 0) * Number(data.waterPrice || 0)
         }
         if (data.waterMode === 'THEO_NGUOI') {
             return Number(data.waterPeople || 1) * Number(data.waterPrice || 0)
@@ -569,20 +593,16 @@ const Invoice = () => {
 
     const buildPayload = (data) => {
         const services = (data.services || []).map((s) => {
-            const kieuTinh = (s.kieuTinh || 'Theo phong').toLowerCase()
-            const donGia = Number(s.amount || 0)
-            let soLuong = 1
-            if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
-                soLuong = Number(data.waterPeople || 1)
-            } else if (kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')) {
-                soLuong = Number(s.soLuong || 1)
-            }
             return {
                 tenDichVu: s.name,
                 kieuTinh: s.kieuTinh,
-                soLuong,
-                donGia,
-                laTuHopDong: s.laTuHopDong !== false
+                soLuong: Number(s.soLuong || 1),
+                donGia: Number(s.donGia || s.amount || 0),
+                thanhTien: null,
+                laTuHopDong: s.laTuHopDong !== false,
+                loaiDichVu: s.loaiDichVu || 'DICH_VU',
+                chiSoDau: s.chiSoDau != null ? Number(s.chiSoDau) : null,
+                chiSoCuoi: s.chiSoCuoi != null ? Number(s.chiSoCuoi) : null
             }
         })
         return {
@@ -596,10 +616,9 @@ const Invoice = () => {
             giaNuoc: num(data.waterPrice),
             kieuTinhNuoc: data.waterMode,
             tienPhong: num(data.rent),
-            tongTien: calcFormTotal(data),
+            phiPhat: num(data.phiPhat) || 0,
             hanThanhToan: data.dueDate || null,
             trangThai: data.status || 'CHUA_THANH_TOAN',
-            ghiChu: data.ghiChu || '',
             danhSachDichVu: services
         }
     }
@@ -774,7 +793,7 @@ const Invoice = () => {
 
                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1340px]">
+                        <table className="w-full min-w-[1440px]">
                             <thead>
                                 <tr className="border-b border-gray-200 bg-gray-50">
                                     <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">Mã hóa đơn</th>
@@ -783,6 +802,7 @@ const Invoice = () => {
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Tiền điện</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Tiền nước</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Dịch vụ</th>
+                                    <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Phí phạt</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Kỳ hóa đơn</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Tổng tiền</th>
                                     <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">Hạn thanh toán</th>
@@ -793,20 +813,22 @@ const Invoice = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={11} className="px-5 py-12 text-center text-sm text-gray-400">Đang tải dữ liệu...</td>
+                                        <td colSpan={12} className="px-5 py-12 text-center text-sm text-gray-400">Đang tải dữ liệu...</td>
                                     </tr>
                                 ) : filteredInvoices.length === 0 ? (
                                     <tr>
-                                        <td colSpan={11} className="px-5 py-12 text-center text-sm text-gray-400">Chưa có hóa đơn nào</td>
+                                        <td colSpan={12} className="px-5 py-12 text-center text-sm text-gray-400">Chưa có hóa đơn nào</td>
                                     </tr>
                                 ) : (
                                     filteredInvoices.map((invoice) => {
                                         const items = buildItemsFromInvoice(invoice)
+                                        const roomAmount = items.find((item) => item.name === 'Tiền phòng')?.amount || 0
                                         const electricity = items.find((item) => item.name === 'Tiền điện')?.amount || 0
                                         const water = items.find((item) => item.name === 'Tiền nước')?.amount || 0
                                         const services = items.filter((item) => item.name !== 'Tiền phòng' && item.name !== 'Tiền điện' && item.name !== 'Tiền nước').reduce((total, item) => total + item.amount, 0)
+                                        const phiPhat = Number(invoice.phiPhat || 0)
                                         const statusInfo = statusConfig[invoice.status] || statusConfig.CHUA_THANH_TOAN
-                                        const displayTotal = Number(invoice.tongTien || computeInvoiceTotal(invoice))
+                                        const displayTotal = Number(invoice.tongTien || 0)
 
                                         return (
                                             <tr key={invoice.id} className="transition-colors hover:bg-gray-50/70">
@@ -822,12 +844,13 @@ const Invoice = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-5 py-4 text-sm text-gray-700">{invoice.room}</td>
-                                                <td className="px-5 py-4 text-center text-sm text-gray-700">{formatNumber(invoice.rent)}</td>
+                                                <td className="px-5 py-4 text-center text-sm text-gray-700">{formatNumber(roomAmount)}</td>
                                                 <td className="px-5 py-4 text-center text-sm text-gray-700">{formatNumber(electricity)}</td>
                                                 <td className="px-5 py-4 text-center text-sm text-gray-700">{formatNumber(water)}</td>
                                                 <td className="px-5 py-4 text-center text-sm text-gray-700">{formatNumber(services)}</td>
+                                                <td className="px-5 py-4 text-center text-sm text-red-600">{phiPhat > 0 ? formatNumber(phiPhat) : '-'}</td>
                                                 <td className="px-5 py-4 text-center text-sm text-gray-700">{formatMonth(invoice.month)}</td>
-                                                <td className="px-5 py-4 text-center text-base text-gray-900">{formatMoney(displayTotal)}</td>
+                                                <td className="px-5 py-4 text-center text-base font-semibold text-gray-900">{formatMoney(displayTotal)}</td>
                                                 <td className="px-5 py-4 text-center text-sm text-gray-700">{formatDate(invoice.dueDate)}</td>
                                                 <td className="px-5 py-4 text-center">
                                                     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusInfo.pillClass}`}>
@@ -1012,18 +1035,29 @@ const Invoice = () => {
                                             {formatMoney(formWaterAmount)}
                                         </span>
                                     </div>
+                                    {formData.waterMode === 'THEO_NGUOI' && (
+                                        <div className="flex items-center justify-between py-3 text-sm">
+                                            <span className="font-medium text-gray-500">
+                                                Nước ({formData.waterPeople || 1} người × {formatNumber(formData.waterPrice || 0)})
+                                            </span>
+                                            <span className="font-semibold text-gray-500">
+                                                {formatMoney(formWaterAmount)}
+                                            </span>
+                                        </div>
+                                    )}
 
-                                    {formData.services.map((service, index) => {
-                                        const kieuTinh = (service.kieuTinh || 'Theo phong').toLowerCase()
+                                    {/* Only show non-utility services here */}
+                                    {formData.services
+                                        .filter((s) => s.loaiDichVu !== 'DIEN' && s.loaiDichVu !== 'NUOC')
+                                        .map((service, index) => {
+                                        const kieuTinh = (service.kieuTinh || 'theo phong').toLowerCase()
                                         const donGia = Number(service.amount || 0)
-                                        let soLuong = 1
-                                        let unit = 'phòng'
-                                        if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
-                                            soLuong = formData.waterPeople || 1
-                                            unit = 'người'
+                                        let soLuong = Math.round(Number(service.soLuong || 1))
+                                        let unitLabel = 'phòng'
+                                        if (kieuTinh.includes('nguoi')) {
+                                            unitLabel = 'người'
                                         } else if (kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')) {
-                                            soLuong = Number(service.soLuong || 1)
-                                            unit = 'số'
+                                            unitLabel = 'lần'
                                         }
                                         const thanhTien = soLuong * donGia
                                         return (
@@ -1040,7 +1074,7 @@ const Invoice = () => {
                                                     </span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                                                    <span>SL: {formatNumber(soLuong)} {unit} × {formatNumber(donGia)} VNĐ/{unit}</span>
+                                                    <span>SL: {formatNumber(soLuong)} {unitLabel} × {formatNumber(donGia)} VNĐ/{unitLabel}</span>
                                                     <span>{service.kieuTinh || 'Theo phòng'}</span>
                                                 </div>
                                             </div>
