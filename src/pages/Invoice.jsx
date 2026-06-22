@@ -353,7 +353,12 @@ const Invoice = () => {
         // formData.services = only DICH_VU items (electric/water handled by dedicated sections)
         let services = (invoice.services || [])
             .filter((s) => s.loaiDichVu === 'DICH_VU')
-            .map((s) => ({ ...s, amount: String(s.amount) }))
+            .map((s) => ({
+                ...s,
+                donGia: Number(s.donGia || 0),
+                soLuong: Number(s.soLuong || 1),
+                amount: String(Number(s.donGia || 0))
+            }))
 
         setFormData({
             maHopDong: invoice.maHopDong || '',
@@ -572,7 +577,18 @@ const Invoice = () => {
         } else {
             waterAmount = Number(data.waterPrice || 0)
         }
-        const servicesTotal = (data.services || []).reduce((sum, s) => sum + Number(s.amount || 0), 0)
+        const peopleCount = Number(data.waterPeople || 1)
+        const servicesTotal = (data.services || []).reduce((sum, s) => {
+            const donGia = Number(s.donGia ?? s.amount ?? 0)
+            const kt = ((s.kieuTinh || '') + '').toLowerCase()
+            let qty = 1
+            if (kt.includes('nguoi') || kt.includes('người')) {
+                qty = peopleCount
+            } else if (kt.includes('chi so') || kt.includes('chỉ số')) {
+                qty = Number(s.soLuong || 1)
+            }
+            return sum + qty * donGia
+        }, 0)
         return rent + electricAmount + waterAmount + servicesTotal
     }
 
@@ -1046,18 +1062,17 @@ const Invoice = () => {
                                         </div>
                                     )}
 
-                                    {/* Only show non-utility services here */}
-                                    {formData.services
-                                        .filter((s) => s.loaiDichVu !== 'DIEN' && s.loaiDichVu !== 'NUOC')
-                                        .map((service, index) => {
-                                        const kieuTinh = (service.kieuTinh || 'theo phong').toLowerCase()
+                                    {formData.services.map((service, index) => {
+                                        const kieuTinh = (service.kieuTinh || 'Theo phong').toLowerCase()
                                         const donGia = Number(service.amount || 0)
-                                        let soLuong = Math.round(Number(service.soLuong || 1))
-                                        let unitLabel = 'phòng'
-                                        if (kieuTinh.includes('nguoi')) {
-                                            unitLabel = 'người'
+                                        let soLuong = 1
+                                        let unit = 'phòng'
+                                        if (kieuTinh.includes('nguoi') || kieuTinh.includes('người')) {
+                                            soLuong = formData.waterPeople || 1
+                                            unit = 'người'
                                         } else if (kieuTinh.includes('chi so') || kieuTinh.includes('chỉ số')) {
-                                            unitLabel = 'lần'
+                                            soLuong = Number(service.soLuong || 1)
+                                            unit = 'số'
                                         }
                                         const thanhTien = soLuong * donGia
                                         return (
@@ -1074,7 +1089,7 @@ const Invoice = () => {
                                                     </span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                                                    <span>SL: {formatNumber(soLuong)} {unitLabel} × {formatNumber(donGia)} VNĐ/{unitLabel}</span>
+                                                    <span>SL: {formatNumber(soLuong)} {unit} × {formatNumber(donGia)} VNĐ/{unit}</span>
                                                     <span>{service.kieuTinh || 'Theo phòng'}</span>
                                                 </div>
                                             </div>
