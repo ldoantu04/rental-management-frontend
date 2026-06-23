@@ -44,7 +44,6 @@ const Chatbot = () => {
     const [messages, setMessages] = useState([])
     const [thinking, setThinking] = useState(false)
     const [sidebarOpen, setSidebarOpen] = useState(true)
-    const [pendingConfirmation, setPendingConfirmation] = useState(null)
 
     const messagesEndRef = useRef(null)
     const inputRef = useRef(null)
@@ -104,7 +103,6 @@ const Chatbot = () => {
     const startNewConversation = () => {
         setActiveConversationId(null)
         setMessages([])
-        setPendingConfirmation(null)
         setTimeout(() => {
             if (inputRef.current) inputRef.current.focus()
         }, 50)
@@ -124,7 +122,6 @@ const Chatbot = () => {
         }
         setMessages((prev) => [...prev, optimisticUserMsg])
         setThinking(true)
-        setPendingConfirmation(null)
 
         try {
             const res = await axios.post(
@@ -135,47 +132,11 @@ const Chatbot = () => {
             const data = res.data || {}
             setActiveConversationId(data.hoiThoaiId)
             setMessages(data.toanBoTinNhan || [])
-
-            const assistantMsg = data.tinNhanTroLy
-            if (assistantMsg && assistantMsg.canXacNhan) {
-                setPendingConfirmation({
-                    messageId: assistantMsg.id,
-                    noiDung: assistantMsg.noiDung,
-                    hanhDong: assistantMsg.hanhDongChoXacNhan
-                })
-            } else {
-                setPendingConfirmation(null)
-            }
             fetchConversations()
         } catch (error) {
             console.log('Loi gui tin nhan:', error)
             toast.error(error.response?.data?.message || 'Khong the gui tin nhan. Vui long thu lai.')
             setMessages((prev) => prev.filter((m) => m.id !== optimisticUserMsg.id))
-        } finally {
-            setThinking(false)
-        }
-    }
-
-    const handleConfirm = async (xacNhan) => {
-        if (!pendingConfirmation) return
-        try {
-            setThinking(true)
-            const res = await axios.post(
-                backendUrl + '/api/chat/confirm',
-                {
-                    hoiThoaiId: activeConversationId,
-                    tinNhanId: pendingConfirmation.messageId,
-                    xacNhan
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            if (res.data) {
-                setMessages((prev) => [...prev, res.data])
-            }
-            setPendingConfirmation(null)
-        } catch (error) {
-            console.log('Loi xac nhan:', error)
-            toast.error(error.response?.data?.message || 'Khong the thuc hien thao tac')
         } finally {
             setThinking(false)
         }
@@ -205,8 +166,6 @@ const Chatbot = () => {
             sendMessage()
         }
     }
-
-    const renderMessageContent = (msg) => msg.noiDung
 
     return (
         <div className="min-h-screen bg-[#F6F7FB]">
@@ -355,7 +314,7 @@ const Chatbot = () => {
                                             <div>
                                                 <div className="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-3">
                                                     <p className="text-sm text-gray-800">
-                                                        Xin chào! Tôi là trợ lý AI của SmartRental. Tôi có thể giúp bạn truy vấn dữ liệu phòng trọ, khách thuê, hợp đồng, hóa đơn, doanh thu, cũng như hỗ trợ thêm phòng, thêm khách, tạo hợp đồng, tạo hóa đơn. Hãy cho tôi biết bạn cần gì.
+                                                        Xin chào! Tôi là trợ lý AI của SmartRental. Tôi có thể hỗ trợ bạn tra cứu thông tin về nhà trọ, phòng trọ, khách thuê, hợp đồng, hóa đơn và doanh thu. Hãy cho tôi biết bạn cần gì.
                                                     </p>
                                                 </div>
                                             </div>
@@ -385,7 +344,7 @@ const Chatbot = () => {
                                                                         : 'bg-gray-100 text-gray-800 rounded-tl-md'
                                                                 }`}
                                                             >
-                                                                {renderMessageContent(msg)}
+                                                                {msg.noiDung}
                                                             </div>
                                                             {msg.ngayTao && (
                                                                 <p className={`text-[11px] text-gray-400 mt-1 ${isUser ? 'text-right' : ''}`}>
@@ -421,34 +380,6 @@ const Chatbot = () => {
                                     </div>
                                 )}
                             </div>
-
-                            {pendingConfirmation && (
-                                <div className="border-t border-gray-200 bg-amber-50 px-5 py-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="text-sm text-amber-800">
-                                            <strong>Yeu cau xac nhan:</strong> {pendingConfirmation.noiDung}
-                                        </p>
-                                        <div className="flex gap-2 flex-shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleConfirm(false)}
-                                                disabled={thinking}
-                                                className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                                            >
-                                                Huy
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleConfirm(true)}
-                                                disabled={thinking}
-                                                className="px-3 py-1.5 rounded-lg bg-[#80001C] text-white text-sm hover:bg-[#6B0018] disabled:opacity-50"
-                                            >
-                                                Xac nhan
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Input */}
                             <div className="border-t border-gray-200 p-4">
