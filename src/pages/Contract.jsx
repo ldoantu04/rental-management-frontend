@@ -32,7 +32,6 @@ const emptyContract = {
     ngayThanhToan: 5,
     chuKyThanhToan: 5,
     danhSachDichVu: [],
-    dichVu: '',
     dieuKhoan: '- Thanh toán đầy đủ trước ngày thanh toán hằng tháng\n- Không được nuôi thú cưng\n- Giữ gìn vệ sinh chung'
 }
 
@@ -234,7 +233,6 @@ const mapContract = (c) => {
         paymentDay: c.ngayThanhToan || 5,
         status: c.trangThaiHienThi || c.trangThai || 'DANG_HIEU_LUC',
         terms: c.dieuKhoan || '',
-        dichVu: c.dichVu || '',
         danhSachDichVu: Array.isArray(c.danhSachDichVu) ? c.danhSachDichVu : []
     }
 }
@@ -359,7 +357,6 @@ const Contract = () => {
                 donGia: s.donGia != null ? String(s.donGia) : '0',
                 laDichVuBoSung: !!s.laDichVuBoSung
             })),
-            dichVu: contract.dichVu || '',
             dieuKhoan: contract.terms || ''
         })
         setShowForm(true)

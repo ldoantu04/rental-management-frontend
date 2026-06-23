@@ -190,6 +190,16 @@ const Header = ({ title }) => {
         }
     }
 
+    const getPageNumbers = (current, total) => {
+        const half = 2
+        let start = Math.max(1, current - half)
+        let end = Math.min(total, start + 4)
+        if (end - start < 4) start = Math.max(1, end - 4)
+        const pages = []
+        for (let i = start; i <= end; i++) pages.push(i)
+        return pages
+    }
+
     return (
         <header className='fixed top-0 left-[220px] right-0 h-[60px] bg-white border-b border-gray-200 flex items-center justify-between px-6 z-20'>
 
@@ -349,25 +359,20 @@ const Header = ({ title }) => {
                                         ‹
                                     </button>
 
-                                    {Array.from(
-                                        { length: totalPages },
-                                        (_, index) => (
-                                            <button
-                                                key={index}
-                                                onClick={() =>
-                                                    setCurrentPage(index + 1)
-                                                }
-                                                className={`h-10 w-10 rounded-xl text-sm font-medium
-                                                ${
-                                                    currentPage === index + 1
-                                                        ? 'bg-[#80001C] text-white'
-                                                        : ''
-                                                }`}
-                                            >
-                                                {index + 1}
-                                            </button>
-                                        )
-                                    )}
+                                    {getPageNumbers(currentPage, totalPages).map((page) => (
+                                        <button
+                                            key={page}
+                                            onClick={() => setCurrentPage(page)}
+                                            className={`h-10 w-10 rounded-xl text-sm font-medium
+                                            ${
+                                                currentPage === page
+                                                    ? 'bg-[#80001C] text-white'
+                                                    : ''
+                                            }`}
+                                        >
+                                            {page}
+                                        </button>
+                                    ))}
 
                                     <button
                                         disabled={

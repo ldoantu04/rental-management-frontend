@@ -10,6 +10,7 @@ const RentalContextProvider = (props) => {
 
     const [token, setToken] = useState('');
     const [user, setUser] = useState(null);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const navigate = useNavigate();
 
     // Khôi phục token từ localStorage khi khởi động
@@ -63,6 +64,7 @@ const RentalContextProvider = (props) => {
         user, setUser,
         navigate,
         logout,
+        showLogoutConfirm, setShowLogoutConfirm,
     };
 
     return (

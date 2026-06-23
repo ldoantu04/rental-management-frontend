@@ -63,6 +63,25 @@ const ConfirmDialog = ({ title, message, confirmText = 'Xác nhận', onCancel, 
 
 const emptyRoommate = { hoTen: '', quanHe: '', cccd: '', sdt: '' }
 
+// ============================================================
+// Validation helpers
+// ============================================================
+const isValidPhone = (v) => !v || /^0[0-9]{9,10}$/.test(v)
+const isValidCccd = (v) => !v || /^[0-9]{12}$/.test(v)
+const isValidEmail = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+const isValidName = (v) => !v || (v.trim().length >= 2 && /^[\p{L}\s]+$/u.test(v))
+
+const formatPhone = (v) => v ? v.replace(/[^\d]/g, '').slice(0, 11) : ''
+const formatCccd = (v) => v ? v.replace(/[^\d]/g, '').slice(0, 12) : ''
+const formatName = (v) => v ? v.replace(/[0-9]/g, '').slice(0, 100) : ''
+
+const VALIDATE = {
+  sdt:   { ok: isValidPhone, msg: 'Số điện thoại phải là 10-11 chữ số, bắt đầu bằng số 0' },
+  cccd:  { ok: isValidCccd,  msg: 'Số CCCD phải là 12 chữ số' },
+  email: { ok: isValidEmail, msg: 'Email không hợp lệ' },
+  hoTen: { ok: isValidName,  msg: 'Họ tên phải từ 2 ký tự, không chứa số' }
+}
+
 const mapTenant = (t) => ({
     id: t.id,
     hoTen: t.hoTen || '',
@@ -117,6 +136,7 @@ const Tenant = () => {
         anhGiayTo: [],
         danhSachNguoiOCung: [{ ...emptyRoommate }]
     })
+    const [fieldErrors, setFieldErrors] = useState({})
 
     const fetchTenants = async () => {
         try {
@@ -165,6 +185,7 @@ const Tenant = () => {
             anhGiayTo: [],
             danhSachNguoiOCung: [{ ...emptyRoommate }]
         })
+        setFieldErrors({})
         setShowForm(true)
     }
 
@@ -184,14 +205,18 @@ const Tenant = () => {
                 ? tenant.danhSachNguoiOCung.map((r) => ({ hoTen: r.hoTen || '', quanHe: r.quanHe || '', cccd: r.cccd || '', sdt: r.sdt || '' }))
                 : [{ ...emptyRoommate }]
         })
+        setFieldErrors({})
         setShowForm(true)
     }
 
     const updateRoommate = (index, field, value) => {
+        const formatted = (field === 'sdt') ? formatPhone(value)
+            : (field === 'cccd') ? formatCccd(value)
+            : value
         setFormData((prev) => ({
             ...prev,
             danhSachNguoiOCung: prev.danhSachNguoiOCung.map((roommate, currentIndex) =>
-                currentIndex === index ? { ...roommate, [field]: value } : roommate
+                currentIndex === index ? { ...roommate, [field]: formatted } : roommate
             )
         }))
     }
@@ -253,8 +278,22 @@ const Tenant = () => {
         danhSachNguoiOCung: (formData.danhSachNguoiOCung || []).filter((r) => r.hoTen && r.hoTen.trim() !== '')
     })
 
+    const validateFields = () => {
+        const errs = {}
+        if (formData.hoTen && !VALIDATE.hoTen.ok(formData.hoTen)) errs.hoTen = VALIDATE.hoTen.msg
+        if (formData.cccd && !VALIDATE.cccd.ok(formData.cccd)) errs.cccd = VALIDATE.cccd.msg
+        if (formData.sdt && !VALIDATE.sdt.ok(formData.sdt)) errs.sdt = VALIDATE.sdt.msg
+        if (formData.email && !VALIDATE.email.ok(formData.email)) errs.email = VALIDATE.email.msg
+        return errs
+    }
+
     const handleSubmit = async (event) => {
         event.preventDefault()
+        const errs = validateFields()
+        if (Object.keys(errs).length > 0) {
+            setFieldErrors(errs)
+            return
+        }
         setSubmitting(true)
         const payload = buildPayload()
         try {
@@ -467,27 +506,92 @@ const Tenant = () => {
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Họ và tên *</span>
-                                        <input required value={formData.hoTen} onChange={(event) => setFormData({ ...formData, hoTen: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Nguyễn Văn A" />
+                                        <input
+                                            required
+                                            value={formData.hoTen}
+                                            onChange={e => {
+                                                const v = formatName(e.target.value)
+                                                setFormData(p => ({ ...p, hoTen: v }))
+                                                if (fieldErrors.hoTen) setFieldErrors(p => ({ ...p, hoTen: undefined }))
+                                            }}
+                                            className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                                fieldErrors.hoTen ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                            }`}
+                                            placeholder="Nguyễn Văn A"
+                                        />
+                                        {fieldErrors.hoTen && <p className="mt-1 text-xs text-red-500">{fieldErrors.hoTen}</p>}
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Ngày sinh</span>
-                                        <input type="date" value={formData.ngaySinh || ''} onChange={(event) => setFormData({ ...formData, ngaySinh: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" />
+                                        <input
+                                            type="date"
+                                            value={formData.ngaySinh || ''}
+                                            onChange={e => setFormData(p => ({ ...p, ngaySinh: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                        />
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Số CCCD *</span>
-                                        <input required value={formData.cccd} onChange={(event) => setFormData({ ...formData, cccd: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="033333333333" />
+                                        <input
+                                            required
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={formData.cccd}
+                                            onChange={e => {
+                                                const v = formatCccd(e.target.value)
+                                                setFormData(p => ({ ...p, cccd: v }))
+                                                if (fieldErrors.cccd) setFieldErrors(p => ({ ...p, cccd: undefined }))
+                                            }}
+                                            className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                                fieldErrors.cccd ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                            }`}
+                                            placeholder="033333333333"
+                                        />
+                                        {fieldErrors.cccd && <p className="mt-1 text-xs text-red-500">{fieldErrors.cccd}</p>}
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Số điện thoại</span>
-                                        <input value={formData.sdt} onChange={(event) => setFormData({ ...formData, sdt: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="0123454523" />
+                                        <input
+                                            type="tel"
+                                            value={formData.sdt}
+                                            onChange={e => {
+                                                const v = formatPhone(e.target.value)
+                                                setFormData(p => ({ ...p, sdt: v }))
+                                                if (fieldErrors.sdt) setFieldErrors(p => ({ ...p, sdt: undefined }))
+                                            }}
+                                            className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                                fieldErrors.sdt ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                            }`}
+                                            placeholder="0901234567"
+                                        />
+                                        {fieldErrors.sdt && <p className="mt-1 text-xs text-red-500">{fieldErrors.sdt}</p>}
                                     </label>
                                     <label className="block">
-                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Email</span>
-                                        <input type="email" value={formData.email} onChange={(event) => setFormData({ ...formData, email: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="email@gmail.com" />
+                                        <span className="mb-1.5 block text-sm font-medium text-gray-700">Email *</span>
+                                        <input
+                                            type="email"
+                                            required
+                                            value={formData.email}
+                                            onChange={e => {
+                                                setFormData(p => ({ ...p, email: e.target.value }))
+                                                if (fieldErrors.email) setFieldErrors(p => ({ ...p, email: undefined }))
+                                            }}
+                                            className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-1 ${
+                                                fieldErrors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-300' : 'border-gray-300 focus:border-[#7A1B2E] focus:ring-[#7A1B2E]'
+                                            }`}
+                                            placeholder="email@domain.com"
+                                        />
+                                        {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
                                     </label>
                                     <label className="block">
                                         <span className="mb-1.5 block text-sm font-medium text-gray-700">Địa chỉ</span>
-                                        <input value={formData.diaChi} onChange={(event) => setFormData({ ...formData, diaChi: event.target.value })} className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]" placeholder="Địa chỉ thường trú" />
+                                        <input
+                                            type="text"
+                                            value={formData.diaChi}
+                                            onChange={e => setFormData(p => ({ ...p, diaChi: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                            placeholder="Địa chỉ thường trú"
+                                        />
                                     </label>
                                 </div>
                             </div>
@@ -516,19 +620,41 @@ const Tenant = () => {
                                             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Họ và tên</span>
-                                                    <input value={roommate.hoTen} onChange={(event) => updateRoommate(index, 'hoTen', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Họ và tên" />
+                                                    <input
+                                                        value={roommate.hoTen}
+                                                        onChange={e => updateRoommate(index, 'hoTen', formatName(e.target.value))}
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                                        placeholder="Họ và tên"
+                                                    />
                                                 </label>
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Quan hệ</span>
-                                                    <input value={roommate.quanHe} onChange={(event) => updateRoommate(index, 'quanHe', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Quan hệ" />
+                                                    <input
+                                                        value={roommate.quanHe}
+                                                        onChange={e => updateRoommate(index, 'quanHe', e.target.value)}
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                                        placeholder="Quan hệ"
+                                                    />
                                                 </label>
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Số CCCD</span>
-                                                    <input value={roommate.cccd} onChange={(event) => updateRoommate(index, 'cccd', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Số CCCD" />
+                                                    <input
+                                                        value={roommate.cccd}
+                                                        onChange={e => updateRoommate(index, 'cccd', formatCccd(e.target.value))}
+                                                        inputMode="numeric"
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                                        placeholder="033333333333"
+                                                    />
                                                 </label>
                                                 <label className="block">
                                                     <span className="mb-1 block text-xs font-medium text-gray-500">Số điện thoại</span>
-                                                    <input value={roommate.sdt} onChange={(event) => updateRoommate(index, 'sdt', event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none" placeholder="Số điện thoại" />
+                                                    <input
+                                                        value={roommate.sdt}
+                                                        onChange={e => updateRoommate(index, 'sdt', formatPhone(e.target.value))}
+                                                        type="tel"
+                                                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#7A1B2E] focus:ring-1 focus:ring-[#7A1B2E]"
+                                                        placeholder="0901234567"
+                                                    />
                                                 </label>
                                             </div>
                                         </div>
