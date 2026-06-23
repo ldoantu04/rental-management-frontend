@@ -5,31 +5,10 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 
 const tabs = [
-    { key: 'payment', label: 'Thanh toán', icon: 'card' },
     { key: 'invoice', label: 'Hóa đơn', icon: 'calendar' },
     { key: 'email', label: 'Mẫu email', icon: 'mail' }
 ]
 
-const paymentMethods = [
-    {
-        name: 'Thanh toán tiền mặt',
-        description: 'Thu tiền trực tiếp tại chỗ',
-        tone: 'green',
-        enabled: true
-    },
-    {
-        name: 'Ví MoMo',
-        description: 'Chưa kết nối',
-        tone: 'pink',
-        enabled: false
-    },
-    {
-        name: 'VNPay QR',
-        description: 'Chưa kết nối',
-        tone: 'red',
-        enabled: false
-    }
-]
 
 const toneMap = {
     'NHAC_THANH_TOAN': 'blue',
@@ -109,45 +88,11 @@ const ReadonlyInput = ({ label, value, helper, placeholder }) => (
     </label>
 )
 
-const PaymentTab = () => (
-    <>
-        <section className="mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Phương thức thanh toán</h2>
-            <p className="text-sm text-gray-500 mt-4">Bật/tắt và cấu hình thông tin tài khoản cho từng phương thức.</p>
-        </section>
-
-        <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <div className="space-y-3 mb-6">
-                {paymentMethods.map((method) => (
-                    <div key={method.name} className="bg-gray-50 rounded-xl px-4 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <SettingIcon tone={method.tone} icon="card" />
-                            <div>
-                                <p className="font-medium text-gray-900">{method.name}</p>
-                                {method.enabled ? (
-                                    <p className="text-sm text-gray-500">{method.description}</p>
-                                ) : (
-                                    <span className="inline-flex mt-1 px-2 py-0.5 rounded-md bg-gray-200 text-xs text-gray-700">
-                                        {method.description}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        <Toggle enabled={method.enabled} />
-                    </div>
-                ))}
-            </div>
-
-        </section>
-    </>
-)
-
 const InvoiceTab = () => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL
 
     const [defaultDueDay, setDefaultDueDay] = useState('')
     const [latePenaltyPercent, setLatePenaltyPercent] = useState('')
-    const [autoGenerateInvoice, setAutoGenerateInvoice] = useState(false)
     const [autoSendOverdueEmail, setAutoSendOverdueEmail] = useState(false)
     const [autoSendPaymentConfirmationEmail, setAutoSendPaymentConfirmationEmail] = useState(false)
     const [autoSendPaymentReminderEmail, setAutoSendPaymentReminderEmail] = useState(false)
@@ -161,7 +106,6 @@ const InvoiceTab = () => {
             const data = res.data
             setDefaultDueDay(data.defaultDueDay != null ? String(data.defaultDueDay) : '')
             setLatePenaltyPercent(data.latePenaltyPercent != null ? String(data.latePenaltyPercent) : '')
-            setAutoGenerateInvoice(data.autoGenerateInvoice || false)
             setAutoSendOverdueEmail(data.autoSendOverdueEmail || false)
             setAutoSendPaymentConfirmationEmail(data.autoSendPaymentConfirmationEmail || false)
             setAutoSendPaymentReminderEmail(data.autoSendPaymentReminderEmail || false)
@@ -191,7 +135,6 @@ const InvoiceTab = () => {
             await axios.put(`${backendUrl}/api/invoice-settings`, {
                 defaultDueDay: defaultDueDay ? Number(defaultDueDay) : null,
                 latePenaltyPercent: latePenaltyPercent ? Number(latePenaltyPercent) : null,
-                autoGenerateInvoice,
                 autoSendOverdueEmail,
                 autoSendPaymentConfirmationEmail,
                 autoSendPaymentReminderEmail
@@ -214,12 +157,6 @@ const InvoiceTab = () => {
     }
 
     const invoiceRules = [
-        {
-            title: 'Tự động tạo hóa đơn hàng tháng',
-            description: 'Hệ thống sẽ tự động tạo hóa đơn vào ngày 1 mỗi tháng',
-            value: autoGenerateInvoice,
-            onChange: (val) => { setAutoGenerateInvoice(val); saveSettings(); }
-        },
         {
             title: 'Tự động gửi email thông báo quá hạn',
             description: 'Gửi mỗi 5 ngày khi quá hạn, đến khi thanh toán xong',
@@ -512,7 +449,7 @@ const EmailTab = () => {
 }
 
 const Setting = () => {
-    const [activeTab, setActiveTab] = useState('payment')
+    const [activeTab, setActiveTab] = useState('invoice')
 
     return (
         <div className="min-h-screen bg-[#F6F7FB]">
@@ -545,7 +482,6 @@ const Setting = () => {
                     ))}
                 </div>
 
-                {activeTab === 'payment' && <PaymentTab />}
                 {activeTab === 'invoice' && <InvoiceTab />}
                 {activeTab === 'email' && <EmailTab />}
             </main>
