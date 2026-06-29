@@ -53,15 +53,18 @@ const LogoutModal = () => {
 
 const App = () => {
 
-  const { token } = useContext(RentalContext)
+  const { token, cachedRole } = useContext(RentalContext)
+
+  const isStaff = cachedRole === 'NHAN_VIEN'
+  const defaultPath = isStaff ? '/phong-tro' : '/tong-quan'
 
   return (
     <div>
       <ToastContainer />
       <Routes>
-        <Route path='/login' element={!token ? <Login /> : <Navigate to='/tong-quan' />} />
-        <Route path='/tong-quan' element={token ? <Overview /> : <Navigate to='/login' />} />
-        <Route path='/' element={<Navigate to={token ? '/tong-quan' : '/login'} />} />
+        <Route path='/login' element={!token ? <Login /> : <Navigate to={defaultPath} />} />
+        <Route path='/tong-quan' element={token ? (isStaff ? <Navigate to='/phong-tro' /> : <Overview />) : <Navigate to='/login' />} />
+        <Route path='/' element={<Navigate to={token ? defaultPath : '/login'} />} />
         <Route path='/nha-tro' element={token ? <Motel /> : <Navigate to='/login' />} />
         <Route path='/phong-tro' element={token ? <Room /> : <Navigate to='/login' />} />
         <Route path='/khach-thue' element={token ? <Tenant /> : <Navigate to='/login' />} />

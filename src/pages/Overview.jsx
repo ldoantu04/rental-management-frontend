@@ -329,7 +329,7 @@ const Overview = () => {
                 </div>
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: card.bgIcon + "15" }}
+                  style={{ backgroundColor: card.bgIcon }}
                 >
                   <img className="w-4 h-4" src={card.icon} alt={card.label} />
                 </div>

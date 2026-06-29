@@ -325,7 +325,7 @@ const Staff = () => {
                                                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDF2F4]">
                                                     <img src={assets.icon_staff} alt="" className="h-4 w-4" />
                                                 </div>
-                                                <span className="text-sm font-semibold text-gray-900">{staff.username}</span>
+                                                <span className="text-sm font-semibold text-gray-900">{staff.id}</span>
                                             </div>
                                         </td>
                                         <td className="px-5 py-4 text-sm text-gray-700">{staff.hoTen || '-'}</td>

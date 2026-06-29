@@ -8,17 +8,11 @@ const RentalContextProvider = (props) => {
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-    const [token, setToken] = useState('');
+    const [token, setToken] = useState(() => localStorage.getItem('token') || '');
     const [user, setUser] = useState(null);
+    const [cachedRole, setCachedRole] = useState(() => localStorage.getItem('userRole') || null);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const navigate = useNavigate();
-
-    // Khôi phục token từ localStorage khi khởi động
-    useEffect(() => {
-        if (!token && localStorage.getItem('token')) {
-            setToken(localStorage.getItem('token'));
-        }
-    }, []);
 
     // Cấu hình axios mặc định kèm Authorization header khi token thay đổi
     useEffect(() => {
@@ -36,6 +30,8 @@ const RentalContextProvider = (props) => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUser(response.data);
+            localStorage.setItem('userRole', response.data.vaiTro);
+            setCachedRole(response.data.vaiTro);
         } catch (error) {
             console.log('Lỗi khi lấy thông tin user:', error);
             if (error.response?.status === 401 || error.response?.status === 403) {
@@ -54,7 +50,9 @@ const RentalContextProvider = (props) => {
     const logout = () => {
         setToken('');
         setUser(null);
+        setCachedRole(null);
         localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
         navigate('/login');
     };
 
@@ -62,6 +60,7 @@ const RentalContextProvider = (props) => {
         backendUrl,
         token, setToken,
         user, setUser,
+        cachedRole,
         navigate,
         logout,
         showLogoutConfirm, setShowLogoutConfirm,

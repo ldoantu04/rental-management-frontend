@@ -9,7 +9,6 @@ import { RentalContext } from '../context/RentalContext'
 const statusConfig = {
     CHUA_THANH_TOAN: { label: 'Chưa thanh toán', pillClass: 'bg-orange-50 text-orange-600', dotClass: 'bg-orange-500', statClass: 'bg-orange-50 border-orange-200 text-orange-700', iconClass: 'bg-orange-500', filterKey: 'UNPAID' },
     DA_THANH_TOAN: { label: 'Đã thanh toán', pillClass: 'bg-green-50 text-green-600', dotClass: 'bg-green-500', statClass: 'bg-green-50 border-green-200 text-green-700', iconClass: 'bg-green-500', filterKey: 'PAID' },
-    QUA_HAN: { label: 'Quá hạn', pillClass: 'bg-red-50 text-red-600', dotClass: 'bg-red-500', statClass: 'bg-red-50 border-red-200 text-red-700', iconClass: 'bg-red-500', filterKey: 'OVERDUE' }
 }
 
 const filterKeyToStatus = {
@@ -764,7 +763,7 @@ const Invoice = () => {
                     </button>
                 </div>
 
-                <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {Object.entries(statusConfig).map(([key, config]) => (
                         <div key={key} className={`rounded-2xl border p-5 shadow-sm ${config.statClass}`}>
                             <div className="flex items-center justify-between">
